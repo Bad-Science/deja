@@ -1,3 +1,5 @@
+#include "pico/stdlib.h"
+
 #ifndef BUFFER_H
 #define BUFFER_H
 
@@ -10,9 +12,6 @@ Buffer buffer_init(uint length) {
   Buffer buffer;
   buffer.length = length;
   buffer.contents = calloc(length, sizeof(uint));
-  for (uint i = 0; i < length; ++i) {
-    buffer[i] = 0;
-  }
 
   return buffer;
 }
@@ -22,9 +21,9 @@ Buffer buffer_init(uint length) {
  */
 void buffer_unshift(Buffer buffer, uint value) {
   for (uint i = 0; i < buffer.length - 1; ++i) {
-    buffer[i] = buffer[i + 1];
+    buffer.contents[i] = buffer.contents[i + 1];
   }
-  buffer[buffer.length - 1] = value;
+  buffer.contents[buffer.length - 1] = value;
 }
 
 uint buffer_tail(Buffer buffer) {
@@ -45,11 +44,11 @@ uint buffer_average(Buffer buffer, size_t from, size_t to) {
 }
 
 uint buffer_average_head(Buffer buffer) {
-  return buffer_average(0, buffer.length / 2 - 1);
+  return buffer_average(buffer, 0, buffer.length / 2 - 1);
 }
 
 uint buffer_average_tail(Buffer buffer) {
-  return buffer_average(buffer.length / 2, buffer.length - 1);
+  return buffer_average(buffer, buffer.length / 2, buffer.length - 1);
 }
 
 #endif
