@@ -27,7 +27,7 @@ void init_io();
 uint read_ign_trigger();
 void start_coil_pulse_in_us(uint64_t delay);
 void start_coil_pulse_in_degrees(float degrees, uint64_t period);
-void start_coil_pulse();
+int64_t start_coil_pulse();
 int64_t end_coil_pulse_callback();
 float get_timing(uint rpm);
 
@@ -87,7 +87,7 @@ int main() {
         advance_mode = true;
       }
       
-      start_coil_pulse();
+      //start_coil_pulse();
       last_trigger_leading_edge_timestamp = trigger_leading_edge_timestamp;
       last_rpm = rpm;
       debounce = true;
@@ -137,12 +137,15 @@ void start_coil_pulse_in_us(uint64_t delay) {
 /*
  * Provide a short pulse to the ignition coil.
  * The coil will trigger on the leading edge of said pulse.
- * The pulse is triggered immediately and is ended by a timer
+ * The pulse is triggered immediately and is ended by a timer.
+ * This function may alse serve as a timer callback itself.
  */
-void start_coil_pulse() {
+int64_t start_coil_pulse() {
   gpio_put(IGN_COIL_PIN, 1);
   gpio_put(LED_PIN, 1);
   add_alarm_in_ms(IGN_COIL_PULSE_DURATION_MS, end_coil_pulse_callback, NULL, true);
+
+  return 0;
 }
 
 int64_t end_coil_pulse_callback() {
