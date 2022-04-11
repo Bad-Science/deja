@@ -43,6 +43,10 @@ int main() {
   uint last_rpm = 0;
   float stator_position = 16.0f;
 
+  gpio_put(IGN_COIL_PIN, 1);
+  sleep_ms(1000);
+  gpio_put(IGN_COIL_PIN, 0);
+
 	while (true) {		
     // TODO: We really should just be pulling a value from the FIFO if it exists so we don't tie up the cpu...
     uint millivolts = read_ign_trigger();
@@ -52,7 +56,7 @@ int main() {
     uint magnitude_average_tail = buffer_average_tail(pulse_magnitude_buffer);
     //if (magnitude_average_head < 10 && magnitude_average_tail >= 10) { /*...*/ }
     
-    if (millivolts > 75 && !debounce) {
+    if (millivolts > 100 && !debounce) {
       uint64_t trigger_leading_edge_timestamp = to_us_since_boot(get_absolute_time());
       uint64_t trigger_delta = trigger_leading_edge_timestamp - last_trigger_leading_edge_timestamp;
       uint rpm = 6E7 / trigger_delta;
@@ -87,7 +91,7 @@ int main() {
       last_trigger_leading_edge_timestamp = trigger_leading_edge_timestamp;
       last_rpm = rpm;
       debounce = true;
-    } else if (millivolts <= 50) {
+    } else if (millivolts <= 75) {
       debounce = false;
     }
 	}
