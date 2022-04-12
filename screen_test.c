@@ -18,7 +18,8 @@ const uint IGN_TRIGGER_PIN = 26;
 const uint IGN_TRIGGER_ADC_CHANNEL = 0;
 const uint IGN_COIL_PIN = 22;
 
-const uint IGN_COIL_PULSE_DURATION_MS = 1;
+const uint IGN_COIL_PULSE_DURATION_MS_SHORT = 1;
+const uint IGN_COIL_PULSE_DURATION_MS = 2;
 const uint IGN_COIL_PULSE_DURATION_MS_LONG = 3;
 
 const float ADC_VOLTAGE_CONVERSION = 3.3f / (1 << 12);
@@ -44,6 +45,7 @@ int main() {
   uint64_t last_trigger_leading_edge_timestamp = 0; // Initial RPMs will be approximately zero
   uint last_rpm = 0;
   float stator_position = 16.0f;
+  float timing_offset = 6.0f;
 
   gpio_put(IGN_COIL_PIN, 1);
   sleep_ms(1000);
@@ -63,7 +65,7 @@ int main() {
       uint64_t trigger_delta = trigger_leading_edge_timestamp - last_trigger_leading_edge_timestamp;
       uint rpm = 6E7 / trigger_delta;
       int rpm_delta = rpm - last_rpm;
-      float desired_ignition_time = get_timing(rpm);
+      float desired_ignition_time = get_timing(rpm) + timing_offset;
 
       /*
        * These conditionals handle entering and exiting "advance mode"
@@ -74,22 +76,26 @@ int main() {
        * Conversely, when exiting advance mode, the current spark is skipped, as one should be already scheduled
        * at approximately the right time by the previous advance mode cycle.
        */
-      
-      if (desired_ignition_time <= stator_position || !advance_mode) {
-        if (!advance_mode) {
-          float ignite_in_degrees = MAX(0, stator_position - desired_ignition_time);
-          start_coil_pulse_in_degrees(ignite_in_degrees, trigger_delta, &IGN_COIL_PULSE_DURATION_MS);
+
+      if (rpm > 60) {
+        if (desired_ignition_time <= stator_position || !advance_mode) {
+          if (!advance_mode) {
+            float ignite_in_degrees = MAX(0, stator_position - desired_ignition_time);
+            start_coil_pulse_in_degrees(ignite_in_degrees, trigger_delta, &IGN_COIL_PULSE_DURATION_MS);
+          }
+          advance_mode = false;
         }
+
+        if (desired_ignition_time > stator_position) {
+          float ignite_in_degrees = 360.0f - (desired_ignition_time - stator_position);
+          start_coil_pulse_in_degrees(ignite_in_degrees, trigger_delta, &IGN_COIL_PULSE_DURATION_MS_LONG);
+          advance_mode = true;
+        }
+      } else {
+        start_coil_pulse(NULL, &IGN_COIL_PULSE_DURATION_MS_SHORT);
         advance_mode = false;
       }
 
-      if (desired_ignition_time > stator_position) {
-        float ignite_in_degrees = 360.0f - (desired_ignition_time - stator_position);
-        start_coil_pulse_in_degrees(ignite_in_degrees, trigger_delta, &IGN_COIL_PULSE_DURATION_MS_LONG);
-        advance_mode = true;
-      }
-      
-      //start_coil_pulse();
       last_trigger_leading_edge_timestamp = trigger_leading_edge_timestamp;
       last_rpm = rpm;
       debounce = true;
@@ -164,7 +170,7 @@ int64_t end_coil_pulse_callback() {
  */
 float get_timing(uint rpm) {
   // flattttttt
-  // return 16.0f;
+  return 16.0f;
   // Simple, naive curve (probably not usable)
   if (rpm < 1000) {
     return 5.0f;
