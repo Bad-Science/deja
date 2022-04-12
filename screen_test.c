@@ -19,15 +19,17 @@ const uint IGN_TRIGGER_ADC_CHANNEL = 0;
 const uint IGN_COIL_PIN = 22;
 
 const uint IGN_COIL_PULSE_DURATION_MS = 1;
+const uint IGN_COIL_PULSE_DURATION_MS_LONG = 3;
+
 const float ADC_VOLTAGE_CONVERSION = 3.3f / (1 << 12);
 
 const uint PULSE_BUFFER_SIZE = 6;
 
 void init_io();
 uint read_ign_trigger();
-void start_coil_pulse_in_us(uint64_t delay);
-void start_coil_pulse_in_degrees(float degrees, uint64_t period);
-int64_t start_coil_pulse();
+void start_coil_pulse_in_us(uint64_t delay, uint* dur);
+void start_coil_pulse_in_degrees(float degrees, uint64_t period, uint* dur);
+int64_t start_coil_pulse(alarm_id_t id, void* dur);
 int64_t end_coil_pulse_callback();
 float get_timing(uint rpm);
 
@@ -76,14 +78,14 @@ int main() {
       if (desired_ignition_time <= stator_position || !advance_mode) {
         if (!advance_mode) {
           float ignite_in_degrees = MAX(0, stator_position - desired_ignition_time);
-          start_coil_pulse_in_degrees(ignite_in_degrees, trigger_delta);
+          start_coil_pulse_in_degrees(ignite_in_degrees, trigger_delta, &IGN_COIL_PULSE_DURATION_MS);
         }
         advance_mode = false;
       }
 
       if (desired_ignition_time > stator_position) {
         float ignite_in_degrees = 360.0f - (desired_ignition_time - stator_position);
-        start_coil_pulse_in_degrees(ignite_in_degrees, trigger_delta);
+        start_coil_pulse_in_degrees(ignite_in_degrees, trigger_delta, &IGN_COIL_PULSE_DURATION_MS_LONG);
         advance_mode = true;
       }
       
@@ -125,13 +127,13 @@ uint read_ign_trigger() {
   return adc_result_millivolts;
 }
 
-void start_coil_pulse_in_degrees(float degrees, uint64_t period) {
+void start_coil_pulse_in_degrees(float degrees, uint64_t period, uint* dur) {
   uint64_t ignite_in_us = (uint64_t) ((degrees / 360.0f) * period);
-  start_coil_pulse_in_us(ignite_in_us);
+  start_coil_pulse_in_us(ignite_in_us, dur);
 }
 
-void start_coil_pulse_in_us(uint64_t delay) {
-  add_alarm_in_us(delay, start_coil_pulse, NULL, true);
+void start_coil_pulse_in_us(uint64_t delay, uint* dur) {
+  add_alarm_in_us(delay, start_coil_pulse, dur, true);
 }
 
 /*
@@ -140,10 +142,11 @@ void start_coil_pulse_in_us(uint64_t delay) {
  * The pulse is triggered immediately and is ended by a timer.
  * This function may alse serve as a timer callback itself.
  */
-int64_t start_coil_pulse() {
+int64_t start_coil_pulse(alarm_id_t id, void* dur) {
   gpio_put(IGN_COIL_PIN, 1);
   gpio_put(LED_PIN, 1);
-  add_alarm_in_ms(IGN_COIL_PULSE_DURATION_MS, end_coil_pulse_callback, NULL, true);
+  uint duration = *((uint*) dur);
+  add_alarm_in_ms(duration, end_coil_pulse_callback, NULL, true);
 
   return 0;
 }
@@ -160,12 +163,23 @@ int64_t end_coil_pulse_callback() {
  * Result is in absolute degrees before top dead center
  */
 float get_timing(uint rpm) {
+  // flattttttt
+  // return 16.0f;
   // Simple, naive curve (probably not usable)
-  if (rpm < 500) {
+  if (rpm < 1000) {
     return 5.0f;
-  } else if (rpm >= 500 && rpm < 10000) {
-    return 30.0f - (float) rpm / 500.0f;
+  } else if (rpm >= 1000 && rpm < 10000) {
+    return 40.0f - (float) rpm / 333.33f;
   } else {
     return 10.0f;
   }
 }
+
+// 5Hz   - 9.2ms after trigger,  200ms period, 
+// 10Hz  - 4.6ms after trigger,  100ms period, 4.6% = 16.5def after triffer  = -0.5deg BTDC = -5.5 error 
+// 20Hz  - 2.0ms before trigger, 50ms period,  4.0% = 14.4deg before trigger = 30.4deg BTDC = -6.0 error
+//                                                              target = 36.4deg BTDC
+// 50Hz  - 0.5ms before trigger, 20ms period,  2.5% = 9.0deg before trigger  = 25.0deg BTDC = -6.0 error
+// 100Hz - 0.0ms before trigger, 10ms period,  0.0% = 0.0deg before trigger  = 16.0deg BTDC = -6.0 error
+// 150Hz - .175ms after trigger. 6.7ms period, 2.6% = 9.45deg after trigger  = 6.55deg BTDC = -6.45 error
+// 200Hz - .175ms after trigger, 5ms period,  3.5% = 12.6deg after trigger  =  3.4deg BTDC = -6.6 error
