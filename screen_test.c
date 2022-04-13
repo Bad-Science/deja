@@ -23,6 +23,7 @@ const uint IGN_COIL_PULSE_DURATION_MS = 2;
 const uint IGN_COIL_PULSE_DURATION_MS_LONG = 3;
 
 const float ADC_VOLTAGE_CONVERSION = 3.3f / (1 << 12);
+const float DERIVITIVE_CONTROL_FACTOR = 30000.0f;
 
 const uint PULSE_BUFFER_SIZE = 6;
 
@@ -42,6 +43,7 @@ int main() {
 
   bool debounce = false;
   bool advance_mode = false;
+  bool running = false;
   uint64_t last_trigger_leading_edge_timestamp = 0; // Initial RPMs will be approximately zero
   uint last_rpm = 0;
   float stator_position = 16.0f;
@@ -65,8 +67,9 @@ int main() {
       uint64_t trigger_delta = trigger_leading_edge_timestamp - last_trigger_leading_edge_timestamp;
       uint rpm = 6E7 / trigger_delta;
       int rpm_delta = rpm - last_rpm;
-      float desired_ignition_time = get_timing(rpm) + timing_offset;
-
+      float drpm_dt = (float) rpm_delta / (float) trigger_delta;
+      float desired_ignition_time = get_timing(rpm) + timing_offset - drpm_dt * DERIVITIVE_CONTROL_FACTOR;
+      
       /*
        * These conditionals handle entering and exiting "advance mode"
        *
@@ -77,7 +80,7 @@ int main() {
        * at approximately the right time by the previous advance mode cycle.
        */
 
-      if (rpm > 60) {
+      if (rpm > 60 && last_rpm > 60) {
         if (desired_ignition_time <= stator_position || !advance_mode) {
           if (!advance_mode) {
             float ignite_in_degrees = MAX(0, stator_position - desired_ignition_time);
@@ -101,6 +104,7 @@ int main() {
       debounce = true;
     } else if (millivolts <= 75) {
       debounce = false;
+      // TODO: use falling edge to update rpm and deltas
     }
 	}
 }
