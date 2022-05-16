@@ -51,7 +51,7 @@ int main() {
   sleep_ms(1000);
   gpio_put(IGN_COIL_PIN, 0);
 
-	while (true) {		
+  while (true) {		
     // TODO: We really should just be pulling a value from the FIFO if it exists so we don't tie up the cpu...
     uint millivolts = read_ign_trigger();
 
@@ -103,6 +103,10 @@ int main() {
       debounce = false;
     }
 	}
+}
+
+void test() {
+  
 }
 
 void init_io() {
