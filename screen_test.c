@@ -11,7 +11,7 @@
 
 #include "buffer.h"
 
-const uint LED_PIN = PICO_DEFAULT_LED_PIN;
+const uint LED_PIN = 15;
 const uint SCREEN_BACKLIGHT_PIN = 0;
 
 const uint IGN_TRIGGER_PIN = 26;
@@ -19,8 +19,8 @@ const uint IGN_TRIGGER_ADC_CHANNEL = 0;
 const uint IGN_COIL_PIN = 22;
 
 const uint IGN_COIL_PULSE_DURATION_MS_SHORT = 1;
-const uint IGN_COIL_PULSE_DURATION_MS = 2;
-const uint IGN_COIL_PULSE_DURATION_MS_LONG = 3;
+const uint IGN_COIL_PULSE_DURATION_MS = 1;
+const uint IGN_COIL_PULSE_DURATION_MS_LONG = 1;
 
 const float ADC_VOLTAGE_CONVERSION = 3.3f / (1 << 12);
 
