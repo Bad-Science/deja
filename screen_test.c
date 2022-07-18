@@ -11,7 +11,7 @@
 
 #include "buffer.h"
 
-const uint LED_PIN = 15;
+const uint LED_PIN = PICO_DEFAULT_LED_PIN;
 const uint SCREEN_BACKLIGHT_PIN = 0;
 
 const uint IGN_TRIGGER_PIN = 26;
