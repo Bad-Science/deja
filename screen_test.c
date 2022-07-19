@@ -14,10 +14,12 @@
 const uint LED_PIN = PICO_DEFAULT_LED_PIN;
 const uint SCREEN_BACKLIGHT_PIN = 0;
 
+const uint IGN_MANUAL_TRIGGER_PIN = 16;
 const uint IGN_TRIGGER_PIN = 26;
 const uint IGN_TRIGGER_ADC_CHANNEL = 0;
 const uint IGN_COIL_PIN = 22;
 
+const uint IGN_MANUAL_DEBOUNCE_MS = 500;
 const uint IGN_COIL_PULSE_DURATION_MS_SHORT = 1;
 const uint IGN_COIL_PULSE_DURATION_MS = 1;
 const uint IGN_COIL_PULSE_DURATION_MS_LONG = 1;
@@ -33,6 +35,8 @@ void start_coil_pulse_in_degrees(float degrees, uint64_t period, uint* dur);
 int64_t start_coil_pulse(alarm_id_t id, void* dur);
 int64_t end_coil_pulse_callback();
 float get_timing(uint rpm);
+bool read_ign_manual_trigger();
+void manual_trigger(uint debounce);
 
 int main() {
   init_io();
@@ -51,7 +55,11 @@ int main() {
   sleep_ms(1000);
   gpio_put(IGN_COIL_PIN, 0);
 
-  while (true) {		
+  while (true) {
+    if (read_ign_manual_trigger()) {
+      manual_trigger(IGN_MANUAL_DEBOUNCE_MS);
+    }
+
     // TODO: We really should just be pulling a value from the FIFO if it exists so we don't tie up the cpu...
     uint millivolts = read_ign_trigger();
 
@@ -109,13 +117,26 @@ void test() {
   
 }
 
+bool read_ign_manual_trigger() {
+  return gpio_get(IGN_MANUAL_TRIGGER_PIN);
+}
+
+/**
+ * Test procedure to manually trigger an ignition pulse.
+ * This function blocks for `manual_trigger_debounce` milliseconds.
+ */
+void manual_trigger(uint debounce) {
+  start_coil_pulse(NULL, &IGN_COIL_PULSE_DURATION_MS);
+  sleep_ms(debounce);
+}
+
 void init_io() {
   // Init stdio
   stdio_init_all();
 
 	// Init screen and LED
-	gpio_init(LED_PIN);
-	gpio_set_dir(LED_PIN, GPIO_OUT);
+  gpio_init(LED_PIN);
+  gpio_set_dir(LED_PIN, GPIO_OUT);
 
   gpio_init(SCREEN_BACKLIGHT_PIN);
 	gpio_set_dir(SCREEN_BACKLIGHT_PIN, GPIO_OUT);
@@ -123,9 +144,13 @@ void init_io() {
   gpio_init(IGN_COIL_PIN);
   gpio_set_dir(IGN_COIL_PIN, GPIO_OUT);
 
+  // Init manual trigger
+  gpio_init(IGN_MANUAL_TRIGGER_PIN);
+  gpio_set_dir(IGN_MANUAL_TRIGGER_PIN, GPIO_OUT);
+
 	// Init coil input
-	adc_init();
-	adc_gpio_init(IGN_TRIGGER_PIN);
+  adc_init();
+  adc_gpio_init(IGN_TRIGGER_PIN);
 }
 
 uint read_ign_trigger() {
