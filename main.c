@@ -1,7 +1,9 @@
 /**
  * Copyright (c) 2022 Nova
  *
- * SPDX-License-Identifier: MIT
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
 #include <stdio.h>
@@ -73,6 +75,8 @@ int main() {
       uint64_t trigger_delta = trigger_leading_edge_timestamp - last_trigger_leading_edge_timestamp;
       uint rpm = 6E7 / trigger_delta;
       int rpm_delta = rpm - last_rpm;
+      float dwell_degrees = (ignition->dwell_ms * 1000.0f) * (360.0f / trigger_delta);
+      // Desired spark timing in degrees before TDC
       float desired_ignition_time = get_timing(rpm) + timing_offset;
 
       /*
