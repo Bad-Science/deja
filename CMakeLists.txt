@@ -21,7 +21,7 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(deja screen_test.c ignition.c)
+add_executable(deja main.c ignition.c)
 
 # Set Project Name and Version
 pico_set_program_name(deja "DEJA")
