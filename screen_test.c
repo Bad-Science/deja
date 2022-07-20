@@ -9,9 +9,10 @@
 #include "hardware/gpio.h"
 #include "hardware/adc.h"
 
+#include "ignition.h"
 #include "buffer.h"
 
-const uint LED_PIN = PICO_DEFAULT_LED_PIN;
+const uint TIMING_LIGHT_PIN = 15;
 const uint SCREEN_BACKLIGHT_PIN = 0;
 
 const uint IGN_MANUAL_TRIGGER_PIN = 16;
@@ -20,9 +21,8 @@ const uint IGN_TRIGGER_ADC_CHANNEL = 0;
 const uint IGN_COIL_PIN = 22;
 
 const uint IGN_MANUAL_DEBOUNCE_MS = 500;
-const uint IGN_COIL_PULSE_DURATION_MS_SHORT = 1;
-const uint IGN_COIL_PULSE_DURATION_MS = 1;
-const uint IGN_COIL_PULSE_DURATION_MS_LONG = 1;
+const uint IGN_TIMING_LIGHT_PULSE_US = 1000;
+const float IGN_DWELL_MS = 1.0f;
 
 const float ADC_VOLTAGE_CONVERSION = 3.3f / (1 << 12);
 
@@ -30,16 +30,19 @@ const uint PULSE_BUFFER_SIZE = 6;
 
 void init_io();
 uint read_ign_trigger();
-void start_coil_pulse_in_us(uint64_t delay, uint* dur);
-void start_coil_pulse_in_degrees(float degrees, uint64_t period, uint* dur);
-int64_t start_coil_pulse(alarm_id_t id, void* dur);
-int64_t end_coil_pulse_callback();
 float get_timing(uint rpm);
 bool read_ign_manual_trigger();
-void manual_trigger(uint debounce);
+void manual_trigger(Ignition_t ignition, uint debounce);
 
 int main() {
   init_io();
+
+  Ignition_t ignition = ignition_init(
+    IGN_COIL_PIN,
+    TIMING_LIGHT_PIN,
+    IGN_DWELL_MS,
+    IGN_TIMING_LIGHT_PULSE_US
+  );
 
   Buffer pulse_time_delta_buffer = buffer_init(PULSE_BUFFER_SIZE);
   Buffer pulse_magnitude_buffer = buffer_init(PULSE_BUFFER_SIZE);
@@ -51,13 +54,10 @@ int main() {
   float stator_position = 16.0f;
   float timing_offset = 6.0f;
 
-  gpio_put(IGN_COIL_PIN, 1);
-  sleep_ms(1000);
-  gpio_put(IGN_COIL_PIN, 0);
-
   while (true) {
+    // Manual trigger / kill switch.
     if (read_ign_manual_trigger()) {
-      manual_trigger(IGN_MANUAL_DEBOUNCE_MS);
+      manual_trigger(ignition, IGN_MANUAL_DEBOUNCE_MS);
     }
 
     // TODO: We really should just be pulling a value from the FIFO if it exists so we don't tie up the cpu...
@@ -89,18 +89,18 @@ int main() {
         if (desired_ignition_time <= stator_position || !advance_mode) {
           if (!advance_mode) {
             float ignite_in_degrees = MAX(0, stator_position - desired_ignition_time);
-            start_coil_pulse_in_degrees(ignite_in_degrees, trigger_delta, &IGN_COIL_PULSE_DURATION_MS);
+            ignition_schedule_spark_in_degrees(ignition, ignite_in_degrees, trigger_delta);
           }
           advance_mode = false;
         }
 
         if (desired_ignition_time > stator_position) {
           float ignite_in_degrees = 360.0f - (desired_ignition_time - stator_position);
-          start_coil_pulse_in_degrees(ignite_in_degrees, trigger_delta, &IGN_COIL_PULSE_DURATION_MS_LONG);
+          ignition_schedule_spark_in_degrees(ignition, ignite_in_degrees, trigger_delta);
           advance_mode = true;
         }
       } else {
-        start_coil_pulse(NULL, &IGN_COIL_PULSE_DURATION_MS_SHORT);
+        ignition_schedule_dwell_in_us(ignition, 0);
         advance_mode = false;
       }
 
@@ -125,8 +125,8 @@ bool read_ign_manual_trigger() {
  * Test procedure to manually trigger an ignition pulse.
  * This function blocks for `manual_trigger_debounce` milliseconds.
  */
-void manual_trigger(uint debounce) {
-  start_coil_pulse(NULL, &IGN_COIL_PULSE_DURATION_MS);
+void manual_trigger(Ignition_t ignition, uint debounce) {
+  ignition_schedule_dwell_in_us(ignition, 0);
   sleep_ms(debounce);
 }
 
@@ -134,15 +134,9 @@ void init_io() {
   // Init stdio
   stdio_init_all();
 
-	// Init screen and LED
-  gpio_init(LED_PIN);
-  gpio_set_dir(LED_PIN, GPIO_OUT);
-
+	// Init screen
   gpio_init(SCREEN_BACKLIGHT_PIN);
 	gpio_set_dir(SCREEN_BACKLIGHT_PIN, GPIO_OUT);
-
-  gpio_init(IGN_COIL_PIN);
-  gpio_set_dir(IGN_COIL_PIN, GPIO_OUT);
 
   // Init manual trigger
   gpio_init(IGN_MANUAL_TRIGGER_PIN);
@@ -150,6 +144,7 @@ void init_io() {
 
 	// Init coil input
   adc_init();
+  
   adc_gpio_init(IGN_TRIGGER_PIN);
 }
 
@@ -162,36 +157,7 @@ uint read_ign_trigger() {
   return adc_result_millivolts;
 }
 
-void start_coil_pulse_in_degrees(float degrees, uint64_t period, uint* dur) {
-  uint64_t ignite_in_us = (uint64_t) ((degrees / 360.0f) * period);
-  start_coil_pulse_in_us(ignite_in_us, dur);
-}
 
-void start_coil_pulse_in_us(uint64_t delay, uint* dur) {
-  add_alarm_in_us(delay, start_coil_pulse, dur, true);
-}
-
-/*
- * Provide a short pulse to the ignition coil.
- * The coil will trigger on the leading edge of said pulse.
- * The pulse is triggered immediately and is ended by a timer.
- * This function may alse serve as a timer callback itself.
- */
-int64_t start_coil_pulse(alarm_id_t id, void* dur) {
-  gpio_put(IGN_COIL_PIN, 1);
-  gpio_put(LED_PIN, 1);
-  uint duration = *((uint*) dur);
-  add_alarm_in_ms(duration, end_coil_pulse_callback, NULL, true);
-
-  return 0;
-}
-
-int64_t end_coil_pulse_callback() {
-  gpio_put(IGN_COIL_PIN, 0);
-  gpio_put(LED_PIN, 0);
-
-  return 0;
-}
 
 /*
  * Returns correct timing as a function of RPMs

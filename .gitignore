@@ -1,2 +1,4 @@
 # Ignore build files
 build/*
+hardware/*
+.vscode
