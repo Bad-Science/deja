@@ -21,9 +21,12 @@ const uint IGN_MANUAL_TRIGGER_PIN = 16;
 const uint IGN_TRIGGER_PIN = 26;
 const uint IGN_TRIGGER_ADC_CHANNEL = 0;
 const uint IGN_COIL_PIN = 22;
+const uint TIMING_COURSE_ADJUST_PIN = 28;
+const uint TIMING_ADC_CHANNEL = 2;
 
+const uint TRIGGERS_PER_REVOLUTION = 1;
 const uint IGN_MANUAL_DEBOUNCE_MS = 500;
-const uint IGN_TIMING_LIGHT_PULSE_US = 1000;
+const uint IGN_TIMING_LIGHT_PULSE_US = 100;
 const float IGN_DWELL_MS = 1.0f;
 
 const float ADC_VOLTAGE_CONVERSION = 3.3f / (1 << 12);
@@ -35,6 +38,7 @@ uint read_ign_trigger();
 float get_timing(uint rpm);
 bool read_ign_manual_trigger();
 void manual_trigger(Ignition_t ignition, uint debounce);
+float read_timing_course_adjust();
 
 int main() {
   init_io();
@@ -52,9 +56,13 @@ int main() {
   bool debounce = false;
   bool advance_mode = false;
   uint64_t last_trigger_leading_edge_timestamp = 0; // Initial RPMs will be approximately zero
+  uint rpm = 0;
   uint last_rpm = 0;
   float stator_position = 16.0f;
-  float timing_offset = 6.0f;
+  float timing_offset = read_timing_course_adjust();
+  float desired_ignition_time = stator_position + timing_offset;
+  float ignite_in_degrees = 0.0f;
+  uint tick = 0;
 
   while (true) {
     // Manual trigger / kill switch.
@@ -73,11 +81,12 @@ int main() {
     if (millivolts > 100 && !debounce) {
       uint64_t trigger_leading_edge_timestamp = to_us_since_boot(get_absolute_time());
       uint64_t trigger_delta = trigger_leading_edge_timestamp - last_trigger_leading_edge_timestamp;
-      uint rpm = 6E7 / trigger_delta;
+      uint64_t true_period = trigger_delta * TRIGGERS_PER_REVOLUTION;
+      rpm = 6E7 / true_period;
       int rpm_delta = rpm - last_rpm;
-      float dwell_degrees = (ignition->dwell_ms * 1000.0f) * (360.0f / trigger_delta);
+      float dwell_degrees = (ignition->dwell_ms * 1000.0f) * (360.0f / true_period);
       // Desired spark timing in degrees before TDC
-      float desired_ignition_time = get_timing(rpm) + timing_offset;
+      desired_ignition_time = (stator_position + timing_offset);
 
       /*
        * These conditionals handle entering and exiting "advance mode"
@@ -92,15 +101,15 @@ int main() {
       if (rpm > 60) {
         if (desired_ignition_time <= stator_position || !advance_mode) {
           if (!advance_mode) {
-            float ignite_in_degrees = MAX(0, stator_position - desired_ignition_time);
-            ignition_schedule_spark_in_degrees(ignition, ignite_in_degrees, trigger_delta);
+            ignite_in_degrees = MAX(0, stator_position - desired_ignition_time);
+            ignition_schedule_spark_in_degrees(ignition, ignite_in_degrees, true_period);
           }
           advance_mode = false;
         }
 
         if (desired_ignition_time > stator_position) {
-          float ignite_in_degrees = 360.0f - (desired_ignition_time - stator_position);
-          ignition_schedule_spark_in_degrees(ignition, ignite_in_degrees, trigger_delta);
+          ignite_in_degrees = 360.0f - (desired_ignition_time - stator_position);
+          ignition_schedule_spark_in_degrees(ignition, ignite_in_degrees, true_period);
           advance_mode = true;
         }
       } else {
@@ -114,6 +123,14 @@ int main() {
     } else if (millivolts <= 75) {
       debounce = false;
     }
+
+    if (!(tick % 1000)) {
+      timing_offset = read_timing_course_adjust();
+      desired_ignition_time = stator_position + timing_offset;
+      printf("Timing: %f\tOffset: %f\tAdvance: %d\tRPM: %d\tIND: %f\n", desired_ignition_time, timing_offset, advance_mode, rpm, ignite_in_degrees);
+    }
+
+    ++tick;
 	}
 }
 
@@ -150,10 +167,13 @@ void init_io() {
   adc_init();
   
   adc_gpio_init(IGN_TRIGGER_PIN);
+
+  // Init timing adjust input
+  adc_gpio_init(TIMING_COURSE_ADJUST_PIN);
 }
 
-uint read_ign_trigger() {
-  adc_select_input(IGN_TRIGGER_ADC_CHANNEL);
+uint read_adc_channel(uint adc_channel) {
+  adc_select_input(adc_channel);
   uint16_t adc_result = adc_read();
   uint adc_result_millivolts = (uint) (adc_result * ADC_VOLTAGE_CONVERSION * 1000);
   //printf("Raw value: 0x%03x, voltage: %f V\n, ", adc_result, adc_result * ADC_VOLTAGE_CONVERSION);
@@ -161,7 +181,15 @@ uint read_ign_trigger() {
   return adc_result_millivolts;
 }
 
+uint read_ign_trigger() {
+  return read_adc_channel(IGN_TRIGGER_ADC_CHANNEL);
+}
 
+float read_timing_course_adjust() {
+  uint millivolts = read_adc_channel(TIMING_ADC_CHANNEL);
+
+  return (int) ((1650.0f - millivolts) * (12.0f / 3300.0f));
+}
 
 /*
  * Returns correct timing as a function of RPMs
