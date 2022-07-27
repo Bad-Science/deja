@@ -14,6 +14,8 @@
 #include "ignition.h"
 #include "buffer.h"
 
+#define debug 0
+
 const uint TIMING_LIGHT_PIN = 15;
 const uint SCREEN_BACKLIGHT_PIN = 0;
 
@@ -55,6 +57,7 @@ int main() {
 
   bool debounce = false;
   bool advance_mode = false;
+  bool direct_mode = false;
   uint64_t last_trigger_leading_edge_timestamp = 0; // Initial RPMs will be approximately zero
   uint rpm = 0;
   uint last_rpm = 0;
@@ -112,9 +115,11 @@ int main() {
           ignition_schedule_spark_in_degrees(ignition, ignite_in_degrees, true_period);
           advance_mode = true;
         }
+        direct_mode = false;
       } else {
         ignition_schedule_dwell_in_us(ignition, 0);
         advance_mode = false;
+        direct_mode = true;
       }
 
       last_trigger_leading_edge_timestamp = trigger_leading_edge_timestamp;
@@ -124,10 +129,13 @@ int main() {
       debounce = false;
     }
 
-    if (!(tick % 1000)) {
+    if (!(tick % 10000)) {
       timing_offset = read_timing_course_adjust();
       desired_ignition_time = stator_position + timing_offset;
-      printf("Timing: %f\tOffset: %f\tAdvance: %d\tRPM: %d\tIND: %f\n", desired_ignition_time, timing_offset, advance_mode, rpm, ignite_in_degrees);
+      #if debug
+        printf("Timing: %f\tOffset: %f\tAdvance: %d\tDirect: %d\tRPM: %d\tIND: %f\n",
+               desired_ignition_time, timing_offset, advance_mode, direct_mode, rpm, ignite_in_degrees);
+      #endif
     }
 
     ++tick;
