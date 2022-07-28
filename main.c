@@ -13,6 +13,7 @@
 
 #include "ignition.h"
 #include "buffer.h"
+#include "trigger.h"
 
 #define debug 0
 
