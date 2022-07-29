@@ -1,8 +1,15 @@
+/**
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
 #ifndef TRIGGER_H
 #define TRIGGER_H
 
 #include "pico/stdlib.h"
-#include "hardware/gpio.h"
+
+enum trigger_type{TRIGGER_COIL_ANALOG, TRIGGER_COIL_DIGITAL};
 
 typedef struct trigger Trigger_t;
 typedef void (*trigger_callback_t)(void);

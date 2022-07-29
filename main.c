@@ -14,6 +14,7 @@
 #include "ignition.h"
 #include "buffer.h"
 #include "trigger.h"
+#include "helpers.h"
 
 #define debug 0
 
@@ -31,8 +32,6 @@ const uint TRIGGERS_PER_REVOLUTION = 1;
 const uint IGN_MANUAL_DEBOUNCE_MS = 500;
 const uint IGN_TIMING_LIGHT_PULSE_US = 100;
 const float IGN_DWELL_MS = 1.0f;
-
-const float ADC_VOLTAGE_CONVERSION = 3.3f / (1 << 12);
 
 const uint PULSE_BUFFER_SIZE = 6;
 
@@ -181,14 +180,6 @@ void init_io() {
   adc_gpio_init(TIMING_COURSE_ADJUST_PIN);
 }
 
-uint read_adc_channel(uint adc_channel) {
-  adc_select_input(adc_channel);
-  uint16_t adc_result = adc_read();
-  uint adc_result_millivolts = (uint) (adc_result * ADC_VOLTAGE_CONVERSION * 1000);
-  //printf("Raw value: 0x%03x, voltage: %f V\n, ", adc_result, adc_result * ADC_VOLTAGE_CONVERSION);
-
-  return adc_result_millivolts;
-}
 
 uint read_ign_trigger() {
   return read_adc_channel(IGN_TRIGGER_ADC_CHANNEL);
