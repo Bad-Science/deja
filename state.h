@@ -14,17 +14,19 @@ typedef struct state {
   uint64_t rpm;
   uint64_t last_tdc;
   uint64_t next_tdc;
-  float air_something;
-} *State_t;
+  float airflow;
+  float head_temp;
+} State_t;
+
+void state_init();
+inline State_t state_get();
+inline State_t state_begin_write();
+inline void state_commit_write(State_t*);
 
 /**
  * Returns a timestamp in us equal to `degrees` before the next tdc as defined in `state`.
  * `degrees` should be positive for degrees BTDC
  */
-uint64_t state_offset_next_tdc_by_degrees(State_t state, float degrees) {
-  float period = state->next_tdc - state->last_tdc;
-  float offset = degrees * (period / 360.f);
-  return state->next_tdc - offset;
-}
+uint64_t state_offset_next_tdc_by_degrees(State_t* state, float degrees);
 
 #endif
