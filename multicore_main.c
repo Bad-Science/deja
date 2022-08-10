@@ -1,11 +1,16 @@
+/**
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+#include <pico/stdlib.h>
+#include <pico/multicore.h>
 #include "timing.h"
 #include "ignition.h"
 #include "trigger.h"
 #include "state.h"
 #include "helpers.h"
-
-#include <pico/stdlib.h>
-#include <pico/multicore.h>
 
 const uint IGN_MANUAL_TRIGGER_PIN = 16;
 const uint TRIGGER_PIN = 26;
