@@ -62,6 +62,10 @@ void ignition_go(Ignition_t ign) {
   ignition_go_alarm_callback(0, ign);
 }
 
+void ignition_set_timing_func(Ignition_t ign, timing_func_t get_timing) {
+  ign->get_timing = get_timing;
+}
+
 void ignition_schedule_spark_in_degrees(Ignition_t ign, float degrees, uint64_t period) {
   uint64_t ignite_in_us = (uint64_t) ((degrees / 360.0f) * period - (ign->dwell_ms * 1000.0f));
   ignition_schedule_dwell_in_us(ign, ignite_in_us);

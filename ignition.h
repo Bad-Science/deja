@@ -16,7 +16,7 @@
 typedef struct ignition* Ignition_t;
 
 /**
- * Construct a new Ignition_t 
+ * Construct a new ignition instance
  */
 Ignition_t ignition_init(
   uint coil_pin,
@@ -27,10 +27,19 @@ Ignition_t ignition_init(
   alarm_pool_t* alarm_pool
 );
 
+/**
+ * Set up GPIO for the ignition output(s)
+ */
 void ignition_init_io(Ignition_t ign);
 
+/**
+ * Begin the ignition alarm loop
+ */
 void ignition_go(Ignition_t ign);
 
+/**
+ * Setter for the timing function. Feel free to call in flight.
+ */
 void ignition_set_timing_func(Ignition_t ign, timing_func_t get_timing);
 
 /**
