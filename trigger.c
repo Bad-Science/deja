@@ -7,6 +7,7 @@
 #include "trigger.h"
 #include "helpers.h"
 
+#include <pico/stdlib.h>
 #include "hardware/gpio.h"
 #include "hardware/adc.h"
 
@@ -20,9 +21,9 @@ struct trigger {
 
 Trigger_t trigger_init(
   enum trigger_type type,
-  uint pin,
-  uint local_frequency,
-  void (*callback)(uint period);
+  uint_8t pin,
+  uint_8t local_frequency,
+  void (*callback)(uint period)
 ) {
   Trigger_t trig = malloc(sizeof(struct trigger));
   trig->pin = pin;
@@ -33,16 +34,17 @@ Trigger_t trigger_init(
 
   if (type == TRIGGER_COIL_ANALOG) {
     adc_gpio_init(pin);
-
     trig->poll = trigger_read_analog(trig);
   } else if (type == TRIGGER_COIL_DIGITAL) {
     trig->poll = trigger_read_digital(trig);
   }
+
+  return trig;
 }
 
 bool trigger_read_analog(Trigger_t trig) {
-  millivolts = read_adc_channel(trig->pin - ADC_CHANNEL_OFFSET);
-  if (millivolts  > 100 && !debounce) {
+  uint64_t millivolts = read_adc_channel(trig->pin - ADC_CHANNEL_OFFSET);
+  if (millivolts  > 100 && !trig->debounce) {
 
   }
 }

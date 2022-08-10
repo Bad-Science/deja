@@ -3,7 +3,6 @@
 #include <pico/sync.h>
 
 static State_t state;
-static mutex_t state_cow_mutex;
 static spin_lock_t* state_spin_lock;
 static uint32_t state_spin_lock_save;
 
@@ -26,6 +25,7 @@ inline State_t state_get() {
   return state_copy;
 }
 
+// TODO: No need for pass by value for writing at this point
 inline State_t state_begin_write() {
   state_spin_lock_save = spin_lock_blocking(state_spin_lock);
   return state;

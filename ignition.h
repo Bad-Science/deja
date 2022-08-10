@@ -10,11 +10,16 @@
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 
+#include "state.h"
+#include "timing.h"
+
 typedef struct ignition {
   uint coil_pin;
   uint indicator_pin;
   float dwell_ms;
   uint timing_light_pulse_us;
+  State_t state;
+  float (*get_timing)(State_t)
 }* Ignition_t;
 
 /**
@@ -24,10 +29,13 @@ Ignition_t ignition_init(
   uint coil_pin,
   uint indicator_pin,
   float dwell_ms,
-  uint timing_light_pulse_us
+  uint timing_light_pulse_us,
+  timing_func_t get_timing
 );
 
 void ignition_init_io(Ignition_t ign);
+
+void ignition_go(Ignition_t ign);
 
 /**
  * Using a timer, schedule the spark to occur in a number of degrees relative to the period.

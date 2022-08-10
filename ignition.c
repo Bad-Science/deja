@@ -5,6 +5,8 @@
  */
 
 #include "ignition.h"
+#include "state.h"
+#include "timing.h"
 
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
@@ -13,13 +15,16 @@ Ignition_t ignition_init(
   uint coil_pin,
   uint indicator_pin,
   float dwell_ms,
-  uint timing_light_pulse_us
+  uint timing_light_pulse_us,
+  timing_func_t get_timing,
+  alarm_pool_t alarm_pool
 ) {
   Ignition_t ign = malloc(sizeof(struct ignition));
   ign->coil_pin = coil_pin;
   ign->indicator_pin = indicator_pin;
   ign->dwell_ms = dwell_ms;
   ign->timing_light_pulse_us = timing_light_pulse_us;
+  ign->get_timing = get_timing;
   ignition_init_io(ign);
 
   return ign;
@@ -30,6 +35,22 @@ void ignition_init_io(Ignition_t ign) {
   gpio_init(ign->coil_pin);
   gpio_set_dir(ign->indicator_pin, GPIO_OUT);
   gpio_set_dir(ign->coil_pin, GPIO_OUT);
+}
+
+int64_t igniton_alarm_callback(alarm_id_t id, void* data) {
+  Ignition_t ign = (Ignition_t) data;
+  if (ign->state->run) {
+    ignition_start_dwell(id, data);
+    float timing_dbtc = ign->get_timing(ign->state->rpm);
+    return state_offset_next_tdc_by_degrees(ign->state, timing_dbtc);
+  } else {
+    return 10000;
+  }
+}
+
+void ignition_go(Ignition_t ign) {
+  alarm_pool_add_alarm_in_us()
+  ignition_go_alarm_callback(0, ign);
 }
 
 void ignition_schedule_spark_in_degrees(Ignition_t ign, float degrees, uint64_t period) {
