@@ -27,7 +27,7 @@
 
 typedef struct state {
   bool run;
-  uint64_t rpm;
+  uint16_t rpm;
   uint64_t last_tdc;
   uint64_t next_tdc;
   float airflow;
@@ -51,6 +51,7 @@ inline State_t state_get();
 inline State_t state_begin_write();
 
 /**
+ * Atomically update the state from an external copy.
  * To be used in conjuction with `state_begin_write()`.
  */
 inline void state_commit_write(State_t*);

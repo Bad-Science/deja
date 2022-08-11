@@ -15,7 +15,12 @@ typedef enum trigger_type trigger_type_t;
 typedef struct trigger* Trigger_t;
 typedef void (*trigger_callback_t)(void);
 
-Trigger_t trigger_init(trigger_type_t, uint8_t pin, uint8_t local_freq);
+Trigger_t trigger_init(
+  trigger_type_t type,
+  uint8_t pin,
+  uint8_t local_freq,
+  float timing_offset_degrees
+);
 
 static bool trigger_read_analog();
 
