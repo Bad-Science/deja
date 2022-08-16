@@ -9,6 +9,7 @@
 #include <hardware/adc.h>
 #include "trigger.h"
 #include "helpers.h"
+#include "state.h"
 
 struct trigger {
   uint8_t pin;
@@ -56,10 +57,12 @@ static inline void trigger_update_state(Trigger_t trig) {
   uint64_t time_delta = current_time - trig->last_trigger;
   uint16_t rpm = 6E7 / (time_delta * trig->local_frequency);
 
-  uint64_t timing_offset_us = time_delta * (timing_offset_degrees / 360.f));
+  uint64_t timing_offset_us = time_delta * (timing_offset_degrees / 360.f);
 
-  State_t state = state_begin_write();
-  state->last_tdc = current_time
+  State_t update = state_begin_write();
+  update.last_tdc = current_time;
+  update.next_tdc = timing_offset_us + current_time + delayed_by_us;
+  state_commit_write(&update);
 }
 
 bool trigger_read_analog(Trigger_t trig) {

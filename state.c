@@ -7,7 +7,8 @@
 #include <pico/sync.h>
 #include "state.h"
 
-static State_t state;
+static State_t[2] state;
+static bool state_index;
 static spin_lock_t* state_spin_lock;
 static uint32_t state_spin_lock_save;
 
@@ -15,29 +16,27 @@ void state_init() {
   uint lock_num = next_striped_spin_lock_num();
   spin_lock_claim(lock_num);
   state_spin_lock = spin_lock_instance(lock_num);
-  state->run = false;
-  state->rpm = 0;
-  state->last_tdc = 0;
-  state->next_tdc = 0;
-  state->airflow = 0;
-  state->head_temp = 0;
+  state_index = 0;
+  state[index] = state[!index] = {0};
 }
 
 inline State_t state_get() {
-  state_spin_lock_save = spin_lock_blocking(state_spin_lock);
-  State_t state_copy = state;
-  spin_unlock(state_spin_lock, state_spin_lock_save);
-  return state_copy;
+  State_t copy = state[state_index];
+  return copy;
 }
 
-// TODO: No need for pass by value for writing at this point
+// TODO: Consider copying state[index] to state[!index] here and returning a pointer
 inline State_t state_begin_write() {
   state_spin_lock_save = spin_lock_blocking(state_spin_lock);
-  return state;
+  return state_get();
 }
 
-inline bool state_commit_write(State_t* new_state) {
-  state = *new_state;
+inline void state_commit_write(State_t* new_state) {
+  state[!state_index] = *new_state;
+  // By swapping the state index, we make the update atomic from the reader's
+  // perspective. This makes the race condition benign at the expense of doubling
+  // the memory used to store the state, to the end of making reads non-blocking
+  state_index = !state_index;
   spin_unlock(state_spin_lock, state_spin_lock_save);
 }
 

@@ -16,10 +16,12 @@
  * and for engine running routines on core1 to read from the state. Multicore-safety is
  * accomplished using a spin-lock. Writes block for the spin-lock and disable interrupts
  * (to avoid deadlocks when being called from the IRQ), so writes should be performed as
- * quickly as possible. Reads block if a write is currently being performed (can assume
- * the block will be extremely short or non-existant) and return a most recent copy of
- * the state. Care should be taken when using a copy for a long time if you care about
- * having the absolutely most current state.
+ * quickly as possible. Reads return the most recent complete copy of the state without
+ * blocking, even if called during a write. This is accomplished by keeping a second
+ * internal copy of the state. During a write, the inactive copy is first updated, then
+ * the active index is updated. Because the index is a single byte, the resulting race
+ * condition is benign. Care should be taken when using a copy for a long time if you
+ * care about having the absolutely most current state.
  * 
  * Only mission-critical, small attributes should be added to the state because of the
  * copy-on-read nature. I guess. There's 256K of RAM, you be the judge.
@@ -40,18 +42,18 @@ typedef struct state {
 void state_init();
 
 /**
- * Returns a copy of the engine state. Blocks if a write is being performed.
+ * Returns a safe copy of the engine state.
  */
 inline State_t state_get();
 
 /**
- * Obtains a lock on the state and returns a safe copy.
- * Please be fast, this blocks reads.
+ * Obtains a lock on the state and returns a safe copy for updating.
+ * Please be fast, this disables interrupts for IRQ safety
  */
 inline State_t state_begin_write();
 
 /**
- * Atomically update the state from an external copy.
+ * Atomically update the state from the write copy and release the lock.
  * To be used in conjuction with `state_begin_write()`.
  */
 inline void state_commit_write(State_t*);
