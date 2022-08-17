@@ -9,7 +9,7 @@
 #include "state.h"
 
 struct scheduler {
-  scheduleable_t items[SCHEDULER_MAX_ITEMS];
+  event_t items[SCHEDULER_MAX_ITEMS];
   uint8_t num_items;
   alarm_pool_t* alarm_pool;
 };
@@ -21,39 +21,32 @@ static inline absolute_time_t to_absolute_time(engine_time_t* time, state_t* sta
   return time;
 }
 
-static alarm_pool_t* scheduler_init_alarm_pool(uint8_t alarm_num) {
-  //TODO
-}
-
-static inline alarm_id_t scheduler_add_alarm(scheduler_t* sched, scheduleable_t* item) {
+static inline alarm_id_t scheduler_add_alarm(scheduler_t* sched, event_t* item) {
   State_t state = get_state();
   absolute_time_t time = to_absolute_time(&(item.when), &state);
   return alarm_pool_add_alarm_at(sched->alarm_pool, time, scheduler_alarm_callback, sched_item, true);
 }
 
 static scheduler_alarm_callback(alarm_id_t id, void* data) {
-  State_t state = get_state();
-  absolute_time_t time = to_absolute_time(&(item.when), &state);
-  scheduleable_t* item = data;
-
-  if (item->what(item)) {
+  if (item->what(data)) {
+    State_t state = get_state();
     return state_offset_next_tdc_by_degrees(&state, item.when.degrees) + item.when.offset;
   }
   return 0;
 }
 
 void scheduler_init(scheduler_t* sched, uint8_t alarm_num) {
-  sched->alarm_pool = scheduler_init_alarm_pool(alarm_num);
+  sched->alarm_pool = alarm_pool_create(alarm_num, SCHEDULER_MAX_ITEMS);
   sched->num_items = 0;
 }
 
-scheduleable_t scheduler_item_init(
-  schduleable_func_t perform,
+event_t scheduler_item_init(
+  event_func_t perform,
   float degrees,
   uint64_t offset,
   void* param
 ) {
-  scheduleable_t item;
+  event_t item;
   item.perform = perform;
   item.when.degrees = degrees;
   item.when.offset = offset;
@@ -61,9 +54,9 @@ scheduleable_t scheduler_item_init(
   return item;
 }
 
-scheduleable_id_t scheduler_add_item(scheduler_t* sched, scheduleable_t item) {
+event_id_t scheduler_add_item(scheduler_t* sched, event_t item) {
   sched->items[sched->num_items] = item;
-  scheduleable_t* sched_item = &(sched[sched->num_items]);
+  event_t* sched_item = &(sched[sched->num_items]);
   sched_item->id = sched[num_items];
 
   scheduler_add_alarm(sched, sched_item);

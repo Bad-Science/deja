@@ -17,21 +17,22 @@ typedef struct engine_time {
 } engine_time_t;
 
 typedef struct scheduler scheduler_t;
-typedef bool (*schduleable_func_t)(scheduleable_t*);
-typedef uint8_t scheduleable_id_t;
+typedef bool (*event_func_t)(event_t*);
+typedef uint8_t event_id_t;
 
-typedef struct scheduleable {
-  schduleable_func_t what;
+typedef struct event {
+  event_func_t what;
   engine_time_t when;
   void* param;
-  scheduleable_id_t id;
-} scheduleable_t;
-
+  event_id_t id;
+} event_t;
 
 void scheduler_init(scheduler_t*, uint8_t alarm_num);
-scheduleable_id_t scheduler_add_item(scheduler_t* sched, scheduleable_t item);
-scheduleable_t scheduler_make_item(
-  schduleable_func_t what,
+
+event_id_t scheduler_add_item(scheduler_t* sched, event_t item);
+
+event_t scheduler_make_item(
+  event_func_t what,
   float degrees,
   int64_t offset,
   void* param
