@@ -14,25 +14,26 @@ struct scheduler {
   alarm_pool_t* alarm_pool;
 };
 
-static inline absolute_time_t to_absolute_time(engine_time_t* time, state_t* state) {
-  absolute_time_t time;
-  uint64_t value = state_offset_next_tdc_by_degrees(&state, item.when.degrees) + item.when.offset;
-  update_us_since_boot(&time, value);
-  return time;
+static inline absolute_time_t to_absolute_time(engine_time_t* time, State_t* state) {
+  absolute_time_t abs_time;
+  uint64_t value = state_offset_next_tdc_by_degrees(state, time->degrees) + time->offset;
+  update_us_since_boot(&abs_time, value);
+  return abs_time;
+}
+
+static int64_t scheduler_alarm_callback(alarm_id_t id, void* data) {
+  event_t* item = data;
+  if (item->what(data)) {
+    State_t state = state_get();
+    return state_offset_next_tdc_by_degrees(&state, item->when.degrees) + item->when.offset;
+  }
+  return 0;
 }
 
 static inline alarm_id_t scheduler_add_alarm(scheduler_t* sched, event_t* item) {
-  State_t state = get_state();
-  absolute_time_t time = to_absolute_time(&(item.when), &state);
-  return alarm_pool_add_alarm_at(sched->alarm_pool, time, scheduler_alarm_callback, sched_item, true);
-}
-
-static scheduler_alarm_callback(alarm_id_t id, void* data) {
-  if (item->what(data)) {
-    State_t state = get_state();
-    return state_offset_next_tdc_by_degrees(&state, item.when.degrees) + item.when.offset;
-  }
-  return 0;
+  State_t state = state_get();
+  absolute_time_t time = to_absolute_time(&(item->when), &state);
+  return alarm_pool_add_alarm_at(sched->alarm_pool, time, scheduler_alarm_callback, item, true);
 }
 
 void scheduler_init(scheduler_t* sched, uint8_t alarm_num) {
@@ -40,24 +41,24 @@ void scheduler_init(scheduler_t* sched, uint8_t alarm_num) {
   sched->num_items = 0;
 }
 
-event_t scheduler_item_init(
-  event_func_t perform,
+event_t scheduler_event_init(
+  event_func_t what,
   float degrees,
   uint64_t offset,
   void* param
 ) {
   event_t item;
-  item.perform = perform;
+  item.what = what;
   item.when.degrees = degrees;
   item.when.offset = offset;
   item.param = param;
   return item;
 }
 
-event_id_t scheduler_add_item(scheduler_t* sched, event_t item) {
+event_id_t scheduler_add_event(scheduler_t* sched, event_t item) {
   sched->items[sched->num_items] = item;
-  event_t* sched_item = &(sched[sched->num_items]);
-  sched_item->id = sched[num_items];
+  event_t* sched_item = &(sched->items[sched->num_items]);
+  sched_item->id = sched->num_items;
 
   scheduler_add_alarm(sched, sched_item);
 
@@ -67,7 +68,7 @@ event_id_t scheduler_add_item(scheduler_t* sched, event_t item) {
 
 
 
-
+/*
 static uint64_t get_time() {
   uint32_t lo = timer_hw->timerlr;
   uint32_t hi = timer_hw->timerhr;
@@ -96,3 +97,4 @@ static void scheduler_in_us(uint8_t alarm_num, uint32_t delay_us, ) {
   // will arm it
   timer_hw->alarm[ALARM_NUM] = (uint32_t) target;
 }
+*/

@@ -50,7 +50,7 @@ int64_t ignition_alarm_callback(alarm_id_t id, void* data) {
   State_t state = state_get();
   if (state.run) {
     ignition_start_dwell(id, data);
-    float timing_dbtc = ign->get_timing(state.rpm);
+    float timing_dbtc = ign->get_timing(&state);
     return state_offset_next_tdc_by_degrees(&state, timing_dbtc);
   } else {
     return 10000;
@@ -59,7 +59,6 @@ int64_t ignition_alarm_callback(alarm_id_t id, void* data) {
 
 void ignition_go(Ignition_t ign) {
   alarm_pool_add_alarm_in_us(ign->alarm_pool, 0, ignition_alarm_callback, ign, true);
-  ignition_go_alarm_callback(0, ign);
 }
 
 void ignition_set_timing_func(Ignition_t ign, timing_func_t get_timing) {

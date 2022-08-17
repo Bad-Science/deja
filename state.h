@@ -44,19 +44,19 @@ void state_init();
 /**
  * Returns a safe copy of the engine state.
  */
-inline State_t state_get();
+State_t state_get();
 
 /**
  * Obtains a lock on the state and returns a safe copy for updating.
  * Please be fast, this disables interrupts for IRQ safety
  */
-inline State_t state_begin_write();
+State_t state_begin_write();
 
 /**
  * Atomically update the state from the write copy and release the lock.
  * To be used in conjuction with `state_begin_write()`.
  */
-inline void state_commit_write(State_t*);
+void state_commit_write(State_t*);
 
 /**
  * Returns a timestamp in us equal to `degrees` before the next tdc as defined in `state`.

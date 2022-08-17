@@ -7,7 +7,7 @@
 #include <pico/sync.h>
 #include "state.h"
 
-static State_t[2] state;
+static State_t state[2] = { { 0 }, { 0 } };
 static bool state_index;
 static spin_lock_t* state_spin_lock;
 static uint32_t state_spin_lock_save;
@@ -17,21 +17,19 @@ void state_init() {
   spin_lock_claim(lock_num);
   state_spin_lock = spin_lock_instance(lock_num);
   state_index = 0;
-  state[index] = state[!index] = {0};
 }
 
-inline State_t state_get() {
-  State_t copy = state[state_index];
-  return copy;
+State_t state_get() {
+  return state[state_index];
 }
 
 // TODO: Consider copying state[index] to state[!index] here and returning a pointer
-inline State_t state_begin_write() {
+State_t state_begin_write() {
   state_spin_lock_save = spin_lock_blocking(state_spin_lock);
   return state_get();
 }
 
-inline void state_commit_write(State_t* new_state) {
+void state_commit_write(State_t* new_state) {
   state[!state_index] = *new_state;
   // By swapping the state index, we make the update atomic from the reader's
   // perspective. This makes the race condition benign at the expense of doubling

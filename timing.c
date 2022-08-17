@@ -7,7 +7,7 @@
 #include "timing.h"
 
 float timing_static(State_t* state) {
-  return #TIMING_STATIC_VALUE;
+  return TIMING_STATIC_VALUE;
 }
 float timing_curved(State_t* state) {
   // Simple, naive curve (probably not usable)

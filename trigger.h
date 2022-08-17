@@ -19,9 +19,8 @@ Trigger_t trigger_init(
   trigger_type_t type,
   uint8_t pin,
   uint8_t local_freq,
-  float timing_offset_degrees
+  float timing_offset_degrees,
+  void (*callback)(uint period)
 );
-
-static bool trigger_read_analog();
 
 #endif
