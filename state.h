@@ -32,8 +32,8 @@ typedef struct state {
   uint16_t rpm;
   uint64_t last_tdc;
   uint64_t next_tdc;
-  float airflow;
-  float head_temp;
+  uint8_t airflow;
+  uint8_t head_temp;
 } State_t;
 
 /**
