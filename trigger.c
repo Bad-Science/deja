@@ -30,8 +30,8 @@ static inline void trigger_update_state(Trigger_t trig) {
   uint64_t timing_offset_us = trigger_period * (trig->timing_offset_degrees / 360.f);
 
   State_t update = state_begin_write();
-  update.last_tdc = current_time;
-  update.next_tdc = timing_offset_us + current_time;
+  update.last_tdc = current_time + timing_offset_us;
+  update.next_tdc = update.last_tdc + trigger_period;
   update.rpm = rpm;
   state_commit_write(&update);
 }
