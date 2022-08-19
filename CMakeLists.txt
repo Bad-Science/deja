@@ -29,7 +29,7 @@ pico_set_program_version(deja "0.1")
 
 
 # pull in common dependencies
-target_link_libraries(deja pico_stdlib hardware_adc)
+target_link_libraries(deja pico_stdlib pico_multicore hardware_adc)
 
 # enable usb serial output
 pico_enable_stdio_usb(deja 1)

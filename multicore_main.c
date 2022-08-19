@@ -6,49 +6,69 @@
 
 #include <pico/stdlib.h>
 #include <pico/multicore.h>
+#include "scheduler.h"
 #include "timing.h"
 #include "ignition.h"
 #include "trigger.h"
 #include "state.h"
 #include "helpers.h"
 
-const uint IGN_MANUAL_TRIGGER_PIN = 16;
-const uint TRIGGER_PIN = 26;
-const uint IGN_COIL_PIN = 22;
-const uint TIMING_COURSE_ADJUST_PIN = 28;
-const uint TIMING_ADC_CHANNEL = 2;
+#define IGN_MANUAL_TRIGGER_PIN 16
+#define TRIGGER_PIN 26
+#define IGN_COIL_PIN 22
+#define IGN_TIMING_LIGHT_PIN 15
+#define TIMING_COURSE_ADJUST_PIN = 28
+#define TIMING_ADC_CHANNEL 2
 
-const uint TRIGGERS_PER_REVOLUTION = 1;
-const uint IGN_TIMING_LIGHT_PULSE_US = 0; // 100 to enable
-const float IGN_DWELL_MS = 1.0f;
+#define TRIGGERS_PER_REVOLUTION 1
+#define IGN_TIMING_LIGHT_PULSE_US 0 // 100 to enable
+#define IGN_DWELL_US 1000
+
+#define SCHEDULER_0_ALARM 1
+#define SCHEDULER_1_ALARM 2
 
 static void core0_main() {
+  Scheduler_t scheduler = scheduler_init(SCHEDULER_0_ALARM);
+
   Trigger_t trigger = trigger_init(
-    TRIGGER_TYPE_DIGITAL,
+    TRIGGER_COIL_DIGITAL,
     TRIGGER_PIN,
-    TRIGGERS_PER_REVOLUTION
+    TRIGGERS_PER_REVOLUTION,
+    0
   );
 
-  trigger_go(trigger);
+  event_t trigger_event = scheduler_event_init(trigger_event_callback, EVENT_RELATIVE_TIME, TRIGGER_POLL_PERIOD, trigger);
+  scheduler_add_event(scheduler, trigger_event);
+
+  tight_loop_contents();
 }
 
 static void core1_main() {
+  Scheduler_t scheduler = scheduler_init(SCHEDULER_1_ALARM);
+
   Ignition_t ignition = ignition_init(
     IGN_COIL_PIN,
-    TIMING_LIGHT_PIN,
-    IGN_DWELL_MS,
-    IGN_TIMING_LIGHT_PULSE_US
+    IGN_TIMING_LIGHT_PIN,
+    IGN_DWELL_US,
+    IGN_TIMING_LIGHT_PULSE_US,
+    timing_static
   );
 
-  ignition_go(ignition);
+  event_t ignition_event = scheduler_event_init(ignition_event_callback, EVENT_RELATIVE_TIME, 0, ignition);
+  scheduler_add_event(scheduler, ignition_event);
+
+  tight_loop_contents();
 }
 
 static void init() {
 
 }
 
-static int main() {
+int main() {
   state_init();
 
+  core0_main();
   multicore_launch_core1(core1_main);
+
+  return 0;
 }

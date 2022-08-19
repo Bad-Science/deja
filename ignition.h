@@ -12,6 +12,7 @@
 #include <hardware/gpio.h>
 #include "state.h"
 #include "timing.h"
+#include "scheduler.h"
 
 typedef struct ignition* Ignition_t;
 
@@ -19,12 +20,12 @@ typedef struct ignition* Ignition_t;
  * Construct a new ignition instance
  */
 Ignition_t ignition_init(
-  uint coil_pin,
-  uint indicator_pin,
-  float dwell_ms,
-  uint timing_light_pulse_us,
-  timing_func_t get_timing,
-  alarm_pool_t* alarm_pool
+  uint8_t coil_pin,
+  uint8_t indicator_pin,
+  uint64_t dwell_us,
+  uint64_t timing_light_pulse_us,
+  timing_func_t get_timing
+  // alarm_pool_t* alarm_pool
 );
 
 /**
@@ -41,6 +42,11 @@ void ignition_go(Ignition_t ign);
  * Setter for the timing function. Feel free to call in flight.
  */
 void ignition_set_timing_func(Ignition_t ign, timing_func_t get_timing);
+
+/**
+ * Callback for the scheduler. Ignition logic lives here.
+ */
+bool ignition_event_callback(event_t* event);
 
 /**
  * Using a timer, schedule the spark to occur in a number of degrees relative to the period.

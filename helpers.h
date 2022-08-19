@@ -10,10 +10,10 @@
 #include <pico/stdlib.h>
 #include <hardware/adc.h>
 
-const float ADC_VOLTAGE_CONVERSION = 3.3f / (1 << 12);
-const uint8_t ADC_CHANNEL_OFFSET = 26;
+static const float ADC_VOLTAGE_CONVERSION = 3.3f / (1 << 12);
+static const uint8_t ADC_CHANNEL_OFFSET = 26;
 
-uint read_adc_channel(uint adc_channel) {
+static inline uint64_t read_adc_channel(uint adc_channel) {
   adc_select_input(adc_channel);
   uint16_t adc_result = adc_read();
   uint64_t adc_result_millivolts = (adc_result * ADC_VOLTAGE_CONVERSION * 1000);

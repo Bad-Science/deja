@@ -62,6 +62,11 @@ void state_commit_write(State_t*);
  * Returns a timestamp in us equal to `degrees` before the next tdc as defined in `state`.
  * `degrees` should be positive for degrees BTDC
  */
-inline uint64_t state_offset_next_tdc_by_degrees(State_t* state, float degrees);
+
+static inline uint64_t state_offset_next_tdc_by_degrees(State_t* state, float degrees) {
+  float period = state->next_tdc - state->last_tdc;
+  float offset = degrees * (period / 360.f);
+  return state->next_tdc - offset;
+}
 
 #endif

@@ -8,31 +8,32 @@
 #include "ignition.h"
 #include "state.h"
 #include "timing.h"
+#include "scheduler.h"
 
 struct ignition {
-  uint coil_pin;
-  uint indicator_pin;
-  float dwell_ms;
-  uint timing_light_pulse_us;
+  uint8_t coil_pin;
+  uint8_t indicator_pin;
+  uint64_t dwell_us;
+  uint64_t timing_light_pulse_us;
   alarm_pool_t* alarm_pool;
   timing_func_t get_timing;
 };
 
 Ignition_t ignition_init(
-  uint coil_pin,
-  uint indicator_pin,
-  float dwell_ms,
-  uint timing_light_pulse_us,
-  timing_func_t get_timing,
-  alarm_pool_t* alarm_pool
+  uint8_t coil_pin,
+  uint8_t indicator_pin,
+  uint64_t dwell_us,
+  uint64_t timing_light_pulse_us,
+  timing_func_t get_timing
+  // alarm_pool_t* alarm_pool
 ) {
   Ignition_t ign = malloc(sizeof(struct ignition));
   ign->coil_pin = coil_pin;
   ign->indicator_pin = indicator_pin;
-  ign->dwell_ms = dwell_ms;
+  ign->dwell_us = dwell_us;
   ign->timing_light_pulse_us = timing_light_pulse_us;
   ign->get_timing = get_timing;
-  ign->alarm_pool = alarm_pool;
+  // ign->alarm_pool = alarm_pool;
   ignition_init_io(ign);
 
   return ign;
@@ -61,12 +62,34 @@ void ignition_go(Ignition_t ign) {
   alarm_pool_add_alarm_in_us(ign->alarm_pool, 0, ignition_alarm_callback, ign, true);
 }
 
+bool ignition_event_callback(event_t* event) {
+  Ignition_t ign = event->param;
+  State_t state = state_get();
+  if (state.run) {
+    // Charge...
+    gpio_put(ign->coil_pin, 1);
+    busy_wait_us(ign->dwell_us);
+
+    // Zap!
+    gpio_put(ign->coil_pin, 0);
+
+    // And again :)
+    event->when.degrees = ign->get_timing(&state);
+    event->when.us = -ign->dwell_us;
+  } else {
+    event->when.degrees = TIMING_STATIC_VALUE;
+    event->when.us = -ign->dwell_us;
+  }
+
+  return true;
+}
+
 void ignition_set_timing_func(Ignition_t ign, timing_func_t get_timing) {
   ign->get_timing = get_timing;
 }
 
 void ignition_schedule_spark_in_degrees(Ignition_t ign, float degrees, uint64_t period) {
-  uint64_t ignite_in_us = (uint64_t) ((degrees / 360.0f) * period - (ign->dwell_ms * 1000.0f));
+  uint64_t ignite_in_us = (uint64_t) ((degrees / 360.0f) * period - ign->dwell_us);
   ignition_schedule_dwell_in_us(ign, ignite_in_us);
 }
 
@@ -77,9 +100,7 @@ void ignition_schedule_dwell_in_us(Ignition_t ign, uint64_t delay) {
 int64_t ignition_start_dwell(alarm_id_t id, void* ign_param) {
   Ignition_t ign = (Ignition_t) ign_param;
   gpio_put(ign->coil_pin, 1);
-  uint64_t duration = (uint64_t) (ign->dwell_ms * 1000.0f);
-
-  add_alarm_in_us(duration, ignition_end_dwell, ign, true);
+  add_alarm_in_us(ign->dwell_us, ignition_end_dwell, ign, true);
 
   return 0;
 }

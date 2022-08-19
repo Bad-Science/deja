@@ -7,7 +7,10 @@
 #ifndef TRIGGER_H
 #define TRIGGER_H
 
-#include "pico/stdlib.h"
+#include <pico/stdlib.h>
+#include "scheduler.h"
+
+#define TRIGGER_POLL_PERIOD 20
 
 enum trigger_type{TRIGGER_COIL_ANALOG, TRIGGER_COIL_DIGITAL};
 typedef enum trigger_type trigger_type_t;
@@ -19,8 +22,9 @@ Trigger_t trigger_init(
   trigger_type_t type,
   uint8_t pin,
   uint8_t local_freq,
-  float timing_offset_degrees,
-  void (*callback)(uint period)
+  float timing_offset_degrees
 );
+
+bool trigger_event_callback(event_t* event);
 
 #endif

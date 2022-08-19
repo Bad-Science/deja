@@ -14,9 +14,9 @@ struct scheduler {
   alarm_pool_t* alarm_pool;
 };
 
-static inline absolute_time_t to_absolute_time(engine_time_t* time, State_t* state) {
+static inline absolute_time_t event_to_absolute_time(engine_time_t* time, State_t* state) {
   absolute_time_t abs_time;
-  uint64_t value = state_offset_next_tdc_by_degrees(state, time->degrees) + time->offset;
+  uint64_t value = event_to_us_since_boot(time, state);
   update_us_since_boot(&abs_time, value);
   return abs_time;
 }
@@ -25,37 +25,41 @@ static int64_t scheduler_alarm_callback(alarm_id_t id, void* data) {
   event_t* item = data;
   if (item->what(data)) {
     State_t state = state_get();
-    return state_offset_next_tdc_by_degrees(&state, item->when.degrees) + item->when.offset;
+    return event_to_us_since_boot(&(item->when), &state);
   }
+  // If callback returns false, do not repeat
   return 0;
 }
 
-static inline alarm_id_t scheduler_add_alarm(scheduler_t* sched, event_t* item) {
+static alarm_id_t scheduler_add_alarm(Scheduler_t sched, event_t* item) {
   State_t state = state_get();
-  absolute_time_t time = to_absolute_time(&(item->when), &state);
+  absolute_time_t time = event_to_absolute_time(&(item->when), &state);
   return alarm_pool_add_alarm_at(sched->alarm_pool, time, scheduler_alarm_callback, item, true);
 }
 
-void scheduler_init(scheduler_t* sched, uint8_t alarm_num) {
+Scheduler_t scheduler_init(uint8_t alarm_num) {
+  Scheduler_t sched = malloc(sizeof(struct scheduler));
   sched->alarm_pool = alarm_pool_create(alarm_num, SCHEDULER_MAX_ITEMS);
   sched->num_items = 0;
+
+  return sched;
 }
 
 event_t scheduler_event_init(
   event_func_t what,
   float degrees,
-  uint64_t offset,
+  int64_t us,
   void* param
 ) {
   event_t item;
   item.what = what;
   item.when.degrees = degrees;
-  item.when.offset = offset;
+  item.when.us = us;
   item.param = param;
   return item;
 }
 
-event_id_t scheduler_add_event(scheduler_t* sched, event_t item) {
+event_id_t scheduler_add_event(Scheduler_t sched, event_t item) {
   sched->items[sched->num_items] = item;
   event_t* sched_item = &(sched->items[sched->num_items]);
   sched_item->id = sched->num_items;

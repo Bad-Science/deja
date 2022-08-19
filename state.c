@@ -37,9 +37,3 @@ void state_commit_write(State_t* new_state) {
   state_index = !state_index;
   spin_unlock(state_spin_lock, state_spin_lock_save);
 }
-
-inline uint64_t state_offset_next_tdc_by_degrees(State_t* state, float degrees) {
-  float period = state->next_tdc - state->last_tdc;
-  float offset = degrees * (period / 360.f);
-  return state->next_tdc - offset;
-}
