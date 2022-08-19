@@ -27,7 +27,9 @@ static inline void trigger_update_state(Trigger_t trig) {
   trig->last_trigger = current_time;
   uint16_t rpm = 6E7 / (trigger_period * trig->local_frequency);
 
-  uint64_t timing_offset_us = trigger_period * (trig->timing_offset_degrees / 360.f);
+  State_t state = state_get();
+  float timing_offset_degrees = state.trigger_timing_offset + trig->timing_offset_degrees;
+  uint64_t timing_offset_us = trigger_period * (timing_offset_degrees / 360.f);
 
   State_t update = state_begin_write();
   update.last_tdc = current_time + timing_offset_us;

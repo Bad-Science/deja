@@ -40,6 +40,9 @@ static void core0_main() {
   event_t trigger_event = scheduler_event_init(trigger_event_callback, EVENT_RELATIVE_TIME, TRIGGER_POLL_PERIOD, trigger);
   scheduler_add_event(scheduler, trigger_event);
 
+  event_t adjust_event = scheduler_event_init(manual_trigger_adjust_callback, EVENT_RELATIVE_TIME, 100000, NULL);
+  scheduler_add_event(scheduler, adjust_event);
+
   tight_loop_contents();
 }
 
@@ -58,6 +61,17 @@ static void core1_main() {
   scheduler_add_event(scheduler, ignition_event);
 
   tight_loop_contents();
+}
+
+static bool manual_trigger_adjust_callback(event_t* event) {
+  uint millivolts = read_adc_channel(TIMING_ADC_CHANNEL);
+
+  int32_t degrees = (int) ((1650.0f - millivolts) * (12.0f / 3300.0f));
+  State_t state = state_begin_write();
+  state.trigger_timing_offset = degrees;
+  state_commit_write(&state);
+
+  return true;
 }
 
 static void init() {

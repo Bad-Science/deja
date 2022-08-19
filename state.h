@@ -34,6 +34,7 @@ typedef struct state {
   uint64_t next_tdc;
   uint8_t airflow;
   uint8_t head_temp;
+  float trigger_timing_offset; // TODO move to persistent storage
 } State_t;
 
 /**
