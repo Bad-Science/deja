@@ -27,6 +27,8 @@
 #define SCHEDULER_0_ALARM 1
 #define SCHEDULER_1_ALARM 2
 
+static bool manual_trigger_adjust_callback(event_t* event);
+
 static void core0_main() {
   Scheduler_t scheduler = scheduler_init(SCHEDULER_0_ALARM);
 
