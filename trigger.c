@@ -29,7 +29,7 @@ static inline void trigger_update_state(Trigger_t trig) {
 
   State_t state = state_get();
   float timing_offset_degrees = state.trigger_timing_offset + trig->timing_offset_degrees;
-  uint64_t timing_offset_us = trigger_period * (timing_offset_degrees / 360.f);
+  uint64_t timing_offset_us = trigger_period * trig->local_frequency * (timing_offset_degrees / 360.f);
 
   State_t update = state_begin_write();
   update.last_tdc = current_time + timing_offset_us;
@@ -42,24 +42,15 @@ static bool trigger_read_analog(Trigger_t trig) {
   uint64_t millivolts = read_adc_channel(trig->pin - ADC_CHANNEL_OFFSET);
   if (millivolts  > 100 && !trig->debounce) {
     trig->debounce = true;
+    return true;
   } else if (millivolts <= 75) {
     trig->debounce = false;
   }
+  return false;
 }
 
 static bool trigger_read_digital() {
   // TODO
-}
-
-static inline void trigger_poll(Trigger_t trig) {
-  if (trig->read(trig)) {
-    if (!trig->debounce) {
-      trigger_update_state(trig);
-    }
-    trig->debounce = true;
-  } else {
-    trig->debounce = false;
-  }
 }
 
 Trigger_t trigger_init(
@@ -85,7 +76,9 @@ Trigger_t trigger_init(
 
 bool trigger_event_callback(event_t* event) {
   Trigger_t trig = event->param;
-  trigger_poll(trig);
+  if (trig->read(trig)) {
+    trigger_update_state(trig);
+  }
 
   return true;
 }
