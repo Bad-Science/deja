@@ -21,7 +21,6 @@ typedef void (*trigger_callback_t)(void);
 Trigger_t trigger_init(
   trigger_type_t type,
   uint8_t pin,
-  uint8_t local_freq,
   float timing_offset_degrees
 );
 

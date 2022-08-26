@@ -10,6 +10,8 @@
 #include "timing.h"
 #include "scheduler.h"
 
+#define SCHEDULE_DWELL 0
+
 struct ignition {
   uint8_t coil_pin;
   uint8_t indicator_pin;
@@ -49,7 +51,7 @@ void ignition_init_io(Ignition_t ign) {
 int64_t ignition_alarm_callback(alarm_id_t id, void* data) {
   Ignition_t ign = (Ignition_t) data;
   State_t state = state_get();
-  if (state.run) {
+  if (state.running) {
     ignition_start_dwell(id, data);
     float timing_dbtc = ign->get_timing(&state);
     return state_offset_next_tdc_by_degrees(&state, timing_dbtc);
@@ -62,26 +64,44 @@ void ignition_go(Ignition_t ign) {
   alarm_pool_add_alarm_in_us(ign->alarm_pool, 0, ignition_alarm_callback, ign, true);
 }
 
+static ignition_dwell_event_callback(event_t* event) {
+  Ignition_t ign = event->param;
+  State_t state = state_get();
+
+  // ~~ Zap! ~~
+  gpio_put(ign->coil_pin, 0);
+
+  // Schedule start of next dwell
+  event->what = ignition_event_callback;
+  event->when.degrees = ign->get_timing(&state);
+  event->when.us = -ign->dwell_us;
+
+  return EVENT_NEXT_CYCLE;
+}
+
+/**
+ * TODO:
+ *  A. Increase dwell maximum to ~2ms. After dwell period (and possibly half way thru)
+ *  re-check state.next_tdc and update schedule. Will need to add ticker.
+ *  B. 
+ * 
+ * */
 bool ignition_event_callback(event_t* event) {
   Ignition_t ign = event->param;
   State_t state = state_get();
-  if (state.run) {
+  if (state.running) {
     // Charge...
     gpio_put(ign->coil_pin, 1);
-    busy_wait_us(ign->dwell_us);
-
-    // Zap!
-    gpio_put(ign->coil_pin, 0);
 
     // And again :)
     event->when.degrees = ign->get_timing(&state);
-    event->when.us = -ign->dwell_us;
+    event->when.us = 0;
   } else {
     event->when.degrees = TIMING_STATIC_VALUE;
     event->when.us = -ign->dwell_us;
   }
 
-  return true;
+  return EVENT_THIS_CYCLE;
 }
 
 void ignition_set_timing_func(Ignition_t ign, timing_func_t get_timing) {

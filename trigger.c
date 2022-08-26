@@ -15,27 +15,30 @@
 struct trigger {
   uint8_t pin;
   bool debounce;
-  uint8_t local_frequency;
+  uint8_t local_frequency; // TODO: Move to config (not state)
   uint64_t last_trigger;
   float timing_offset_degrees;
+  uint64_t clock;
   bool (*read)(Trigger_t);
 };
 
 static inline void trigger_update_state(Trigger_t trig) {
   uint64_t current_time = to_us_since_boot(get_absolute_time());
+
   uint64_t trigger_period = current_time - trig->last_trigger;
-  trig->last_trigger = current_time;
-  uint16_t rpm = 6E7 / (trigger_period * trig->local_frequency);
+  uint16_t physical_period = trigger_period * trig->local_frequency;
 
   State_t state = state_get();
   float timing_offset_degrees = state.trigger_timing_offset + trig->timing_offset_degrees;
-  uint64_t timing_offset_us = trigger_period * trig->local_frequency * (timing_offset_degrees / 360.f);
+  uint64_t timing_offset_us = physical_period * (timing_offset_degrees / 360.f);
 
   State_t update = state_begin_write();
-  update.last_tdc = current_time + timing_offset_us;
-  update.next_tdc = update.last_tdc + trigger_period;
-  update.rpm = rpm;
+  update.period = physical_period;
+  update.next_tdc = current_time + trigger_period + timing_offset_us;
+  ++update.clock;
   state_commit_write(&update);
+
+  trig->last_trigger = current_time;
 }
 
 static bool trigger_read_analog(Trigger_t trig) {
@@ -63,6 +66,7 @@ Trigger_t trigger_init(
   trig->pin = pin;
   trig->local_frequency = local_frequency;
   trig->last_trigger = 0;
+  trig->clock = 0;
 
   if (type == TRIGGER_COIL_ANALOG) {
     adc_gpio_init(pin);
@@ -78,6 +82,8 @@ bool trigger_event_callback(event_t* event) {
   Trigger_t trig = event->param;
   if (trig->read(trig)) {
     trigger_update_state(trig);
+  } else if (trig->update) {
+
   }
 
   return true;

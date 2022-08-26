@@ -9,6 +9,11 @@
 
 #include <pico/stdlib.h>
 
+/** Use to get RPMs from Period */
+#define RPM(period) (6E7 / (period))
+
+typedef uint64_t engine_clock_t;
+
 /**
  * Multicore-safe global state singleton.
  * 
@@ -26,16 +31,27 @@
  * Only mission-critical, small attributes should be added to the state because of the
  * copy-on-read nature. I guess. There's 256K of RAM, you be the judge.
  */
-
 typedef struct state {
-  bool run;
-  uint16_t rpm;
-  uint64_t last_tdc;
+  /** Engine is physically moving */
+  bool running;
+
+  /** Next top dead center. May or may not be a "waste spark" */
   uint64_t next_tdc;
+
+  /** Running degree clock value of next_tdc */
+  engine_clock_t clock;
+
+  /** Physical engine rotation period. Accounts for "waste" TDCs if there are any */
+  uint32_t period;
+
+  /** Airflow into the intake */
   uint8_t airflow;
+
+  /** Head temperature in degrees celcius */
   uint8_t head_temp;
+
+  /** User set trigger offset in degrees */
   float trigger_timing_offset; // TODO move to persistent config
-  uint8_t trigger_frequency;   // TODO move to persistent config
 } State_t;
 
 /**
@@ -60,14 +76,22 @@ State_t state_begin_write();
  */
 void state_commit_write(State_t*);
 
+/** Neat lil state helper babies UwU */
+
+/** Updates state running status */
+static inline void state_set_running(State_t* state, bool running) {
+  if (!running) {
+    state->clock = 0;
+  }
+  state->running = running;
+}
+
 /**
  * Returns a timestamp in us equal to `degrees` before the next tdc as defined in `state`.
  * `degrees` should be positive for degrees BTDC
  */
-
 static inline uint64_t state_offset_next_tdc_by_degrees(State_t* state, float degrees) {
-  float period = state->next_tdc - state->last_tdc;
-  float offset = degrees * (period / 360.f);
+  float offset = degrees * state->period / 360.f;
   return state->next_tdc - offset;
 }
 

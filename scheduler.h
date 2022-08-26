@@ -13,11 +13,15 @@
 #define SCHEDULER_MAX_ITEMS 4
 #define EVENT_RELATIVE_TIME -1
 #define EVENT_ABSOLUTE_TIME -2
+#define EVENT_CANCEL 0
+#define EVENT_NEXT_CYCLE 1
+#define EVENT_THIS_CYCLE 2
 
 typedef struct scheduler* Scheduler_t;
+typedef struct scheduled_event scheduled_event_t;
 typedef struct event event_t;
 typedef struct engine_time engine_time_t;
-typedef bool (*event_func_t)(event_t*);
+typedef int8_t (*event_func_t)(event_t*);
 typedef uint8_t event_id_t;
 
 struct engine_time {
@@ -25,11 +29,16 @@ struct engine_time {
   int64_t us;
 };
 
+struct scheduled_event {
+  event_id_t id;
+  uint64_t clock;
+  event_t event;
+}
+
 struct event {
   event_func_t what;
   engine_time_t when;
   void* param;
-  event_id_t id;
 };
 
 Scheduler_t scheduler_init(uint8_t alarm_num);
@@ -43,14 +52,4 @@ event_t scheduler_event_init(
   void* param
 );
 
-static inline uint64_t event_to_us_since_boot(engine_time_t* time, State_t* state) {
-  uint64_t us_since_boot = time->us;
-  if (time->degrees >= 0) {
-    us_since_boot += state_offset_next_tdc_by_degrees(state, time->degrees);
-  } else if (time->degrees == EVENT_RELATIVE_TIME) {
-    us_since_boot += time_us_64();
-  }
-  
-  return us_since_boot;
-}
 #endif
