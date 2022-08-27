@@ -11,6 +11,7 @@
 #include "scheduler.h"
 
 #define TRIGGER_POLL_PERIOD 20
+#define TRIGGER_TIMEOUT_PERIOD 1000000
 
 enum trigger_type{TRIGGER_COIL_ANALOG, TRIGGER_COIL_DIGITAL};
 typedef enum trigger_type trigger_type_t;
@@ -21,9 +22,10 @@ typedef void (*trigger_callback_t)(void);
 Trigger_t trigger_init(
   trigger_type_t type,
   uint8_t pin,
+  uint8_t local_frequency,
   float timing_offset_degrees
 );
 
-bool trigger_event_callback(event_t* event);
+void trigger_event_callback(event_t* event);
 
 #endif

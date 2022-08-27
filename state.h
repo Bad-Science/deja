@@ -42,7 +42,10 @@ typedef struct state {
   engine_clock_t clock;
 
   /** Physical engine rotation period. Accounts for "waste" TDCs if there are any */
-  uint32_t period;
+  uint32_t physical_period;
+
+  /** Time between ignition cycles. Equal to state.period / local trigger frequency */
+  uint32_t ignition_period;
 
   /** Airflow into the intake */
   uint8_t airflow;
@@ -84,15 +87,6 @@ static inline void state_set_running(State_t* state, bool running) {
     state->clock = 0;
   }
   state->running = running;
-}
-
-/**
- * Returns a timestamp in us equal to `degrees` before the next tdc as defined in `state`.
- * `degrees` should be positive for degrees BTDC
- */
-static inline uint64_t state_offset_next_tdc_by_degrees(State_t* state, float degrees) {
-  float offset = degrees * state->period / 360.f;
-  return state->next_tdc - offset;
 }
 
 #endif

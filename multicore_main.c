@@ -27,7 +27,7 @@
 #define SCHEDULER_0_ALARM 1
 #define SCHEDULER_1_ALARM 2
 
-static bool manual_trigger_adjust_callback(event_t* event);
+static void manual_trigger_adjust_callback(event_t* event);
 
 static void core0_main() {
   Scheduler_t scheduler = scheduler_init(SCHEDULER_0_ALARM);
@@ -39,10 +39,10 @@ static void core0_main() {
     0
   );
 
-  event_t trigger_event = scheduler_event_init(trigger_event_callback, EVENT_RELATIVE_TIME, TRIGGER_POLL_PERIOD, trigger);
+  event_t trigger_event = scheduler_event_init(trigger_event_callback, RELATIVE_US, -1, TRIGGER_POLL_PERIOD, trigger);
   scheduler_add_event(scheduler, trigger_event);
 
-  event_t adjust_event = scheduler_event_init(manual_trigger_adjust_callback, EVENT_RELATIVE_TIME, 100000, NULL);
+  event_t adjust_event = scheduler_event_init(manual_trigger_adjust_callback, RELATIVE_US, -1, 100000, NULL);
   scheduler_add_event(scheduler, adjust_event);
 
   tight_loop_contents();
@@ -59,21 +59,19 @@ static void core1_main() {
     timing_static
   );
 
-  event_t ignition_event = scheduler_event_init(ignition_event_callback, EVENT_RELATIVE_TIME, 0, ignition);
+  event_t ignition_event = scheduler_event_init(ignition_event_callback, NEXT_CYCLE, TIMING_STATIC_VALUE, -IGN_DWELL_US, ignition);
   scheduler_add_event(scheduler, ignition_event);
 
   tight_loop_contents();
 }
 
-static bool manual_trigger_adjust_callback(event_t* event) {
+static void manual_trigger_adjust_callback(event_t* event) {
   uint millivolts = read_adc_channel(TIMING_ADC_CHANNEL);
 
   int32_t degrees = (int) ((1650.0f - millivolts) * (12.0f / 3300.0f));
   State_t state = state_begin_write();
   state.trigger_timing_offset = degrees;
   state_commit_write(&state);
-
-  return true;
 }
 
 static void init() {

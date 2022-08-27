@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+#include <pico/stdlib.h>
 #include <pico/time.h>
 #include "scheduler.h"
 #include "state.h"
@@ -15,95 +16,71 @@ struct scheduler {
 };
 
 static inline uint64_t event_to_us_since_boot(scheduled_event_t* item, State_t* state) {
-  uint64_t us_since_boot = item->event.when.us;
+  uint64_t next_time;
 
-  // Relative time mode
-  if (item->event.when.degrees == EVENT_RELATIVE_TIME) {
-    return us_since_boot + time_us_64;
-  }
-
-  // Absolute time mode
-  if (item->event.when.degrees == EVENT_ABSOLUTE_TIME) {
-    return us_since_boot;
-  }
-
-  
-
-  if (item->event.when.degrees >= 0) {
-    us_since_boot += state_offset_next_tdc_by_degrees(state, time->degrees);
-
-  
-  return us_since_boot;
-}
-
-static inline absolute_time_t event_to_absolute_time(engine_time_t* time, State_t* state) {
-  absolute_time_t abs_time;
-  uint64_t value = event_to_us_since_boot(time, state);
-  update_us_since_boot(&abs_time, value);
-  return abs_time;
-}
-
-static int64_t scheduler_alarm_callback(alarm_id_t id, void* data) {
-  uint64_t now = time_us_64();
-  scheduled_event_t* item = data;
-  int8_t next_mode = item->event.what(data->event);
-  State_t state = state_get();
-  int64_t next_time;
-  
   // Cancel event
-  if (next_mode == EVENT_CANCEL) {
+  if (item->event.mode == EVENT_CANCEL) {
     // TODO: Remove the thing
     next_time = 0;
   }
 
   // Relative time mode
-  if (item->event.when.degrees == EVENT_RELATIVE_TIME) {
-    next_time = now + item->event.when.us;
-    item->clock = state.clock;
+  if (item->event.mode == RELATIVE_US) {
+    next_time = time_us_64() + item->event.when.us;
+    item->clock = state->clock;
   }
 
   // Absolute time mode
-  if (item->event.when.degrees == EVENT_ABSOLUTE_TIME) {
+  if (item->event.mode == ABSOLUTE_US) {
     next_time = item->event.when.us;
-    item->clock = state.clock;
+    item->clock = state->clock;
   }
 
   // Degree mode - Schedule for current cycle (next tdc)
-  if (next_mode == EVENT_THIS_CYCLE && item->clock == state.clock) {
-    next_time = state.next_tdc - item->event.when.degrees * state.period / 360.f;
+  if (item->event.mode == SAME_CYCLE && item->clock == state->clock) {
+    next_time = state->next_tdc - item->event.when.degrees * state->physical_period / 360.f;
   }
 
   // Degree mode - Schedule for next cycle (next tdc)
-  if (next_mode == EVENT_NEXT_CYCLE && item->clock == state.clock - 1) {
-    next_time = state.next_tdc - item->event.when.degrees * state.period / 360.f;
-    item->clock = state.clock;
+  if (item->event.mode == NEXT_CYCLE && item->clock == state->clock - 1) {
+    next_time = state->next_tdc - item->event.when.degrees * state->physical_period / 360.f;
+    item->clock = state->clock;
   }
 
   // Degree mode - Schedule for current cycle (previous tdc)
-  if (next_mode == EVENT_THIS_CYCLE && item->clock == state.clock - 1) {
-    next_time = state.next_tdc - state.period - item->event.when.degrees * state.period / 360.f;
+  if (item->event.mode == SAME_CYCLE && item->clock == state->clock - 1) {
+    next_time = state->next_tdc - state->ignition_period - item->event.when.degrees * state->physical_period / 360.f;
   }
 
   // Degree mode - Schedule for next cycle (previous tdc)
-  if (next_time == EVENT_NEXT_CYCLE && item->clock == state.clock) {
-    next_time = state.next_tdc + state.period - item->event.when.degrees * state.period / 360.f;
-    item->clock = state.clock;
+  if (next_time == NEXT_CYCLE && item->clock == state->clock) {
+    next_time = state->next_tdc + state->ignition_period - item->event.when.degrees * state->physical_period / 360.f;
+    item->clock = state->clock;
   }
 
-  
-
-  if (item->what(data)) {
-    State_t state = state_get();
-    return event_to_us_since_boot(&(item->when), &state);
-  }
-  // If callback returns false, do not repeat
   return next_time;
+}
+
+static inline absolute_time_t event_to_absolute_time(scheduled_event_t* item, State_t* state) {
+  absolute_time_t abs_time;
+  uint64_t value = event_to_us_since_boot(item, state);
+  update_us_since_boot(&abs_time, value);
+  return abs_time;
+}
+
+static int64_t scheduler_alarm_callback(alarm_id_t id, void* data) {
+  scheduled_event_t* item = data;
+  //uint64_t previous_clock = item->clock;
+  item->event.what(&(item->event));
+  State_t state = state_get();
+
+  return event_to_us_since_boot(item, &state);
 }
 
 static alarm_id_t scheduler_add_alarm(Scheduler_t sched, scheduled_event_t* item) {
   State_t state = state_get();
   
-  absolute_time_t time = event_to_absolute_time(&(item->when), &state);
+  absolute_time_t time = event_to_absolute_time(item, &state);
   return alarm_pool_add_alarm_at(sched->alarm_pool, time, scheduler_alarm_callback, item, true);
 }
 
@@ -117,12 +94,14 @@ Scheduler_t scheduler_init(uint8_t alarm_num) {
 
 event_t scheduler_event_init(
   event_func_t what,
+  schedule_mode_t mode,
   float degrees,
   int64_t us,
   void* param
 ) {
   event_t item;
   item.what = what;
+  item.mode = mode;
   item.when.degrees = degrees;
   item.when.us = us;
   item.param = param;

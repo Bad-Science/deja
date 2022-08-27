@@ -33,7 +33,8 @@ static inline void trigger_update_state(Trigger_t trig) {
   uint64_t timing_offset_us = physical_period * (timing_offset_degrees / 360.f);
 
   State_t update = state_begin_write();
-  update.period = physical_period;
+  update.physical_period = physical_period;
+  update.ignition_period = trigger_period;
   update.next_tdc = current_time + trigger_period + timing_offset_us;
   ++update.clock;
   state_commit_write(&update);
@@ -78,13 +79,22 @@ Trigger_t trigger_init(
   return trig;
 }
 
-bool trigger_event_callback(event_t* event) {
+void trigger_event_callback(event_t* event) {
   Trigger_t trig = event->param;
-  if (trig->read(trig)) {
+  bool triggered = trig->read(trig);
+  State_t state = state_get();
+  if (triggered) {
+    if (!state.running) {
+      // Engine is running again!
+      State_t update = state_begin_write();
+      state_set_running(&update, true);
+      state_commit_write(&update);
+    }
     trigger_update_state(trig);
-  } else if (trig->update) {
-
+  } else if (state.running && time_us_64() - trig->last_trigger > TRIGGER_TIMEOUT_PERIOD) {
+    // Engine has stopped
+    State_t update = state_begin_write();
+    state_set_running(&update, false);
+    state_commit_write(&update);
   }
-
-  return true;
 }

@@ -11,10 +11,11 @@ float timing_static(State_t* state) {
 }
 float timing_curved(State_t* state) {
   // Simple, naive curve (probably not usable)
-  if (state->rpm < 1000) {
+  uint16_t rpm = RPM(state->physical_period);
+  if (rpm < 1000) {
     return 5.0f;
-  } else if (state->rpm >= 1000 && state->rpm < 10000) {
-    return 40.0f - (float) state->rpm / 333.33f;
+  } else if (rpm >= 1000 && rpm < 10000) {
+    return 40.0f - (float) rpm / 333.33f;
   } else {
     return 10.0f;
   }
