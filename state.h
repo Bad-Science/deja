@@ -12,6 +12,7 @@
 /** Use to get RPMs from Period */
 #define RPM(period) (6E7 / (period))
 
+typedef void (*state_listener_func_t)(State_t*);
 typedef uint64_t engine_clock_t;
 
 /**

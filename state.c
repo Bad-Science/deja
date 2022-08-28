@@ -7,10 +7,16 @@
 #include <pico/sync.h>
 #include "state.h"
 
+struct state_listener {
+  state_listener_func_t update;
+  void* param;
+};
+
 static State_t state[2] = { { 0 }, { 0 } };
 static bool state_index;
 static spin_lock_t* state_spin_lock;
 static uint32_t state_spin_lock_save;
+static listeners
 
 void state_init() {
   uint lock_num = next_striped_spin_lock_num();
@@ -36,4 +42,5 @@ void state_commit_write(State_t* new_state) {
   // the memory used to store the state, to the end of making reads non-blocking
   state_index = !state_index;
   spin_unlock(state_spin_lock, state_spin_lock_save);
+
 }
