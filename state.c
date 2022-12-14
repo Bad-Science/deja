@@ -7,16 +7,17 @@
 #include <pico/sync.h>
 #include "state.h"
 
-struct state_listener {
+typedef struct state_listener {
   state_listener_func_t update;
   void* param;
-};
+} state_listener_t;
 
 static State_t state[2] = { { 0 }, { 0 } };
 static bool state_index;
 static spin_lock_t* state_spin_lock;
 static uint32_t state_spin_lock_save;
-static listeners
+static state_listener_t state_listeners[STATE_MAX_LISTENERS] = { 0 };
+static uint8_t state_num_listeners = 0;
 
 void state_init() {
   uint lock_num = next_striped_spin_lock_num();

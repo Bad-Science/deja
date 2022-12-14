@@ -11,11 +11,11 @@
 #include "state.h"
 
 #define SCHEDULER_MAX_ITEMS 4
-#define EVENT_CANCEL 0
-#define EVENT_RELATIVE_TIME 1
-#define EVENT_ABSOLUTE_TIME 2
-#define EVENT_NEXT_CYCLE 3
-#define EVENT_THIS_CYCLE 4
+// #define EVENT_CANCEL 0
+// #define EVENT_RELATIVE_TIME 1
+// #define EVENT_ABSOLUTE_TIME 2
+// #define EVENT_NEXT_CYCLE 3
+// #define EVENT_THIS_CYCLE 4
 
 typedef struct scheduler* Scheduler_t;
 typedef struct scheduled_event scheduled_event_t;
@@ -43,13 +43,16 @@ struct scheduled_event {
   event_id_t id;
   uint64_t clock;
   event_t event;
+  bool scheduled;
+  alarm_id_t alarm_id;
+  Scheduler_t scheduler;
 };
 
 Scheduler_t scheduler_init(uint8_t alarm_num);
 
 event_id_t scheduler_add_event(Scheduler_t sched, event_t item);
 
-void scheduler_refresh(Scheduler_t sched);
+void scheduler_refresh(Scheduler_t sched, State_t* state);
 
 event_t scheduler_event_init(
   event_func_t what,

@@ -9,9 +9,12 @@
 
 #include <pico/stdlib.h>
 
+#define STATE_MAX_LISTENERS 4
+
 /** Use to get RPMs from Period */
 #define RPM(period) (6E7 / (period))
 
+typedef struct state State_t;
 typedef void (*state_listener_func_t)(State_t*);
 typedef uint64_t engine_clock_t;
 
@@ -32,7 +35,7 @@ typedef uint64_t engine_clock_t;
  * Only mission-critical, small attributes should be added to the state because of the
  * copy-on-read nature. I guess. There's 256K of RAM, you be the judge.
  */
-typedef struct state {
+struct state {
   /** Engine is physically moving */
   bool running;
 
@@ -56,7 +59,7 @@ typedef struct state {
 
   /** User set trigger offset in degrees */
   float trigger_timing_offset; // TODO move to persistent config
-} State_t;
+};
 
 /**
  * Initializes the state singleton with zero values

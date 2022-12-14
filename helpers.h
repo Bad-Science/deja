@@ -22,4 +22,10 @@ static inline uint64_t read_adc_channel(uint adc_channel) {
   return adc_result_millivolts;
 }
 
+static inline absolute_time_t to_absolute_time_t(uint64_t time) {
+  absolute_time_t abs_time;
+  update_us_since_boot(&abs_time, time);
+  return abs_time;
+}
+
 #endif

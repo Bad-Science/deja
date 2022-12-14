@@ -16,5 +16,6 @@ typedef float (*timing_func_t)(State_t*);
 
 float timing_static(State_t* state);
 float timing_curved(State_t* state);
+//TODO: Read from file
 
 #endif

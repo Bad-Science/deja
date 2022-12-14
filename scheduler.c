@@ -8,6 +8,10 @@
 #include <pico/time.h>
 #include "scheduler.h"
 #include "state.h"
+#include "helpers.h"
+
+static bool scheduler_add_alarm(Scheduler_t sched, scheduled_event_t* item, State_t* state);
+static int64_t scheduler_alarm_callback(alarm_id_t id, void* data);
 
 struct scheduler {
   scheduled_event_t items[SCHEDULER_MAX_ITEMS];
@@ -15,11 +19,15 @@ struct scheduler {
   alarm_pool_t* alarm_pool;
 };
 
+static inline bool needs_scheduling(scheduled_event_t* item) {
+  return !(item->scheduled || item->event.mode == CANCEL);
+}
+
 static inline uint64_t event_to_us_since_boot(scheduled_event_t* item, State_t* state) {
   uint64_t next_time;
 
   // Cancel event
-  if (item->event.mode == EVENT_CANCEL) {
+  if (item->event.mode == CANCEL) {
     // TODO: Remove the thing
     next_time = 0;
   }
@@ -27,13 +35,11 @@ static inline uint64_t event_to_us_since_boot(scheduled_event_t* item, State_t* 
   // Relative time mode
   if (item->event.mode == RELATIVE_US) {
     next_time = time_us_64() + item->event.when.us;
-    item->clock = state->clock;
   }
 
   // Absolute time mode
   if (item->event.mode == ABSOLUTE_US) {
     next_time = item->event.when.us;
-    item->clock = state->clock;
   }
 
   // Degree mode - Schedule for current cycle (next tdc)
@@ -44,7 +50,6 @@ static inline uint64_t event_to_us_since_boot(scheduled_event_t* item, State_t* 
   // Degree mode - Schedule for next cycle (next tdc)
   if (item->event.mode == NEXT_CYCLE && item->clock == state->clock - 1) {
     next_time = state->next_tdc - item->event.when.degrees * state->physical_period / 360.f;
-    item->clock = state->clock;
   }
 
   // Degree mode - Schedule for current cycle (previous tdc)
@@ -54,34 +59,48 @@ static inline uint64_t event_to_us_since_boot(scheduled_event_t* item, State_t* 
 
   // Degree mode - Schedule for next cycle (previous tdc)
   if (next_time == NEXT_CYCLE && item->clock == state->clock) {
-    next_time = state->next_tdc + state->ignition_period - item->event.when.degrees * state->physical_period / 360.f;
-    item->clock = state->clock;
+    next_time = 0;
+    // next_time = state->next_tdc + state->ignition_period - item->event.when.degrees * state->physical_period / 360.f;
   }
 
   return next_time;
 }
 
-static inline absolute_time_t event_to_absolute_time(scheduled_event_t* item, State_t* state) {
-  absolute_time_t abs_time;
-  uint64_t value = event_to_us_since_boot(item, state);
-  update_us_since_boot(&abs_time, value);
-  return abs_time;
+static bool scheduler_add_alarm(Scheduler_t sched, scheduled_event_t* item, State_t* state) {  
+  uint64_t time = event_to_us_since_boot(item, state);
+
+  if (item->event.mode == CANCEL || time == 0) {
+    return false;
+  }
+
+  if (item->event.mode != SAME_CYCLE) {
+    item->clock = state->clock;
+  }
+
+  alarm_id_t alarm_id = alarm_pool_add_alarm_at(
+    sched->alarm_pool,
+    to_absolute_time_t(time),
+    scheduler_alarm_callback,
+    item,
+    true
+  );
+
+  assert(alarm_id >= 0);
+  item->alarm_id = alarm_id;
+
+  return true;
 }
 
 static int64_t scheduler_alarm_callback(alarm_id_t id, void* data) {
   scheduled_event_t* item = data;
-  //uint64_t previous_clock = item->clock;
   item->event.what(&(item->event));
-  State_t state = state_get();
 
-  return event_to_us_since_boot(item, &state);
-}
+  if (item->event.mode != CANCEL) {
+    State_t state = state_get();
+    item->scheduled = scheduler_add_alarm(item->scheduler, item, &state);
+  }
 
-static alarm_id_t scheduler_add_alarm(Scheduler_t sched, scheduled_event_t* item) {
-  State_t state = state_get();
-  
-  absolute_time_t time = event_to_absolute_time(item, &state);
-  return alarm_pool_add_alarm_at(sched->alarm_pool, time, scheduler_alarm_callback, item, true);
+  return 0;
 }
 
 Scheduler_t scheduler_init(uint8_t alarm_num) {
@@ -115,10 +134,21 @@ event_id_t scheduler_add_event(Scheduler_t sched, event_t event) {
   sched_event->event = event;
   sched_event->clock = state.clock;
   sched_event->id = sched->num_items;
+  sched_event->scheduled = false;
+  sched_event->scheduler = sched;
 
-  scheduler_add_alarm(sched, sched_event);
+  scheduler_add_alarm(sched, sched_event, &state);
 
   return sched->num_items++;
+}
+
+void scheduler_refresh(Scheduler_t sched, State_t* state) {
+  if (!state->running) return;
+  for (uint8_t i = 0; i < sched->num_items; ++i) {
+    if (sched->items[i].scheduled) continue;
+    if (sched->items[i].clock > state->clock) continue;
+    scheduler_add_alarm(sched, sched->items + i, state);
+  }
 }
 
 
